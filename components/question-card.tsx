@@ -1,0 +1,274 @@
+"use client"
+
+import { useState } from "react"
+import { Card, CardContent, CardHeader } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Checkbox } from "@/components/ui/checkbox"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import type { Question } from "@/lib/types"
+import { ChevronDown, ChevronUp, Eye, EyeOff, MessageSquare, CheckCircle2, XCircle, RotateCcw } from "lucide-react"
+import { QuestionRenderer } from "./question-renderers/question-renderer"
+import { cn } from "@/lib/utils"
+
+interface QuestionCardProps {
+  question: Question
+  isSelected: boolean
+  onSelectChange: (selected: boolean) => void
+  onFeedbackSubmit?: (questionId: string, questionPreview: string, feedbackText: string) => void
+}
+
+export function QuestionCard({
+  question,
+  isSelected,
+  onSelectChange,
+  onFeedbackSubmit,
+}: QuestionCardProps) {
+  const [showAnswer, setShowAnswer] = useState(false)
+  const [isExpanded, setIsExpanded] = useState(true)
+  const [feedbackOpen, setFeedbackOpen] = useState(false)
+  const [feedbackText, setFeedbackText] = useState("")
+
+  // New states for interactive system
+  const [userAnswer, setUserAnswer] = useState<any>(null)
+  const [isChecked, setIsChecked] = useState(false)
+  const [isCorrect, setIsCorrect] = useState<boolean | null>(null)
+
+  const handleFeedbackSubmit = () => {
+    const text = feedbackText.trim()
+    if (!text || !onFeedbackSubmit) return
+    const preview = question.questionText.slice(0, 80) + (question.questionText.length > 80 ? "…" : "")
+    onFeedbackSubmit(question.id, preview, text)
+    setFeedbackText("")
+    setFeedbackOpen(false)
+  }
+
+  const handleCheckAnswer = () => {
+    if (question.interaction !== "check_answers") return
+    if (!userAnswer || (Array.isArray(userAnswer) && userAnswer.length === 0)) return
+
+    const selected = (userAnswer as string[]) || []
+    const actual = Array.isArray(question.correctAnswer)
+      ? question.correctAnswer
+      : [question.correctAnswer]
+
+    // Simple key-based comparison (e.g., ['a'] vs ['a'])
+    const correct = selected.length === actual.length &&
+      selected.every(v => actual.includes(v.toLowerCase().trim()))
+
+    setIsCorrect(correct)
+    setIsChecked(true)
+  }
+
+  const handleReset = () => {
+    setUserAnswer(null)
+    setIsChecked(false)
+    setIsCorrect(null)
+    setShowAnswer(false)
+  }
+
+  return (
+    <Card className={cn(
+      "overflow-hidden transition-all border-l-4",
+      isChecked
+        ? isCorrect
+          ? "border-l-green-500 shadow-green-50/50"
+          : "border-l-red-500 shadow-red-50/50"
+        : "border-l-transparent"
+    )}>
+      <CardHeader className="pb-3">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <Checkbox
+              checked={isSelected}
+              onCheckedChange={onSelectChange}
+              className="mt-1"
+              aria-label={`Välj fråga ${question.questionNumber} för Anki-export`}
+            />
+            <div className="space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="outline" className="font-medium">
+                  {question.semester}
+                </Badge>
+                <Badge
+                  variant={question.examType === "regular" ? "default" : "secondary"}
+                  className="font-medium"
+                >
+                  {question.examType === "regular" ? "Ordinarie" : "Omtenta"}
+                </Badge>
+                <Badge variant="secondary">{question.subjectArea}</Badge>
+                <span className="text-xs text-muted-foreground">{question.examPeriod}</span>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Fråga {question.questionNumber}
+              </p>
+            </div>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => setIsExpanded(!isExpanded)}
+            aria-label={isExpanded ? "Fäll ihop frågan" : "Expandera frågan"}
+          >
+            {isExpanded ? (
+              <ChevronUp className="h-4 w-4" />
+            ) : (
+              <ChevronDown className="h-4 w-4" />
+            )}
+          </Button>
+        </div>
+      </CardHeader>
+
+      {isExpanded && (
+        <CardContent className="pt-0">
+          <div className="space-y-6">
+            {/* Question Text */}
+            <div className="rounded-lg bg-secondary/30 p-4 border border-border/50">
+              <p className="text-foreground leading-relaxed font-medium">
+                {question.questionText}
+              </p>
+            </div>
+
+            {/* Interactive Renderer */}
+            <div className="py-2">
+              <QuestionRenderer
+                question={question}
+                userAnswer={userAnswer}
+                onAnswerChange={setUserAnswer}
+                disabled={isChecked}
+              />
+            </div>
+
+            {/* Check Result Feedback */}
+            {isChecked && (
+              <div className={cn(
+                "flex items-center gap-3 p-4 rounded-lg animate-in zoom-in-95 duration-200",
+                isCorrect ? "bg-green-500/10 text-green-700 border border-green-500/20" : "bg-red-500/10 text-red-700 border border-red-500/20"
+              )}>
+                {isCorrect ? (
+                  <>
+                    <CheckCircle2 className="h-5 w-5 shrink-0" />
+                    <div>
+                      <p className="font-semibold">Rätt svar!</p>
+                      <p className="text-sm">Bra jobbat, du har förstått konceptet.</p>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="h-5 w-5 shrink-0" />
+                    <div>
+                      <p className="font-semibold">Inte helt rätt...</p>
+                      <p className="text-sm">Kolla igenom alternativen en gång till.</p>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+              <div className="flex flex-wrap items-center gap-2">
+                {question.interaction === "check_answers" ? (
+                  !isChecked ? (
+                    <Button
+                      onClick={handleCheckAnswer}
+                      disabled={!userAnswer || (Array.isArray(userAnswer) && userAnswer.length === 0)}
+                      className="gap-2 bg-accent hover:bg-accent/90"
+                    >
+                      Rätta svar
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      onClick={handleReset}
+                      className="gap-2"
+                    >
+                      <RotateCcw className="h-4 w-4" />
+                      Gör om
+                    </Button>
+                  )
+                ) : (
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowAnswer(!showAnswer)}
+                    className="gap-2"
+                  >
+                    {showAnswer ? (
+                      <><EyeOff className="h-4 w-4" /> Dölj svar</>
+                    ) : (
+                      <><Eye className="h-4 w-4" /> Visa svar</>
+                    )}
+                  </Button>
+                )}
+              </div>
+
+              <Dialog open={feedbackOpen} onOpenChange={setFeedbackOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:text-foreground">
+                    <MessageSquare className="h-4 w-4" />
+                    Feedback
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Feedback på frågan</DialogTitle>
+                    <DialogDescription>
+                      Beskriv fel, oklarheter eller förbättringsförslag. Din feedback visas för administratören.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-2 py-2">
+                    <Label htmlFor="feedback-text">Din feedback</Label>
+                    <Textarea
+                      id="feedback-text"
+                      placeholder="T.ex. stavfel i frågan, fel svar, otydlighet..."
+                      value={feedbackText}
+                      onChange={(e) => setFeedbackText(e.target.value)}
+                      rows={4}
+                      className="resize-none"
+                    />
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setFeedbackOpen(false)}>
+                      Avbryt
+                    </Button>
+                    <Button
+                      onClick={handleFeedbackSubmit}
+                      disabled={!feedbackText.trim() || !onFeedbackSubmit}
+                    >
+                      Skicka feedback
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
+
+            {/* Answer Section (only for show_answer mode or when revealed explicitly somehow) */}
+            {showAnswer && (
+              <div className="space-y-4 animate-in fade-in-0 slide-in-from-top-2 duration-200">
+                <div className="rounded-lg border border-accent/20 bg-accent/5 p-4">
+                  <h4 className="mb-2 text-xs font-bold text-accent uppercase tracking-wider">
+                    Korrekt Svar / Förklaring
+                  </h4>
+                  <p className="text-foreground leading-relaxed whitespace-pre-wrap">
+                    {question.answer}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      )}
+    </Card >
+  )
+}

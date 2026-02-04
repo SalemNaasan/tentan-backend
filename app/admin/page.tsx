@@ -1,0 +1,1270 @@
+"use client"
+
+import React from "react"
+import { useState, useCallback, useEffect } from "react"
+import * as XLSX from "xlsx"
+import { Header } from "@/components/header"
+import { Footer } from "@/components/footer"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Badge } from "@/components/ui/badge"
+import { Textarea } from "@/components/ui/textarea"
+import { Upload, FileText, Check, X, Edit2, Loader2, AlertCircle, Lock, Trash2, List, MessageSquare } from "lucide-react"
+import type { Semester, ExamType, SubjectArea, ExamPeriod, InteractionType, Question, QuestionFeedback, FeedbackStatus } from "@/lib/types"
+import { EXAM_PERIODS } from "@/lib/types"
+import { mockQuestions } from "@/lib/mock-data"
+import {
+  getCustomQuestions,
+  setCustomQuestions,
+  getDeletedQuestionIds,
+  setDeletedQuestionIds,
+} from "@/lib/questions-store"
+import { getFeedback, updateFeedbackStatus } from "@/lib/feedback-store"
+
+const ADMIN_PASSWORD = "salem"
+
+interface ExtractedQuestion {
+  id: string
+  questionNumber: string
+  theme: string
+  interaction: InteractionType
+  questionText: string
+  options?: string[]
+  correctAnswer: string | string[]
+  status: "pending" | "approved" | "rejected" | "editing"
+}
+
+interface UploadState {
+  status: "idle" | "uploading" | "processing" | "complete" | "error"
+  progress: number
+  fileName?: string
+  error?: string
+}
+
+// Only show the tema codes you actually use
+const subjects: SubjectArea[] = ["pu", "gen", "gnm", "vf", "erl", "cren", "ibi", "nspr"]
+
+const subjectLabels: Record<SubjectArea, string> = {
+  pu: "PU",
+  gen: "GEN",
+  gnm: "GNM",
+  vf: "VF",
+  erl: "ERL",
+  cren: "CREN",
+  ibi: "IBI",
+  nspr: "NSPR",
+  Other: "Övrigt",
+}
+
+// Helper function to map Excel \"tema\" to SubjectArea codes
+function mapSubjectToArea(tema: string): SubjectArea {
+  if (!tema) return "Other"
+  const lowerTema = tema.toLowerCase().trim()
+  if (lowerTema.startsWith("pu")) return "pu"
+  if (lowerTema.startsWith("gen")) return "gen"
+  if (lowerTema.startsWith("gnm")) return "gnm"
+  if (lowerTema.startsWith("vf")) return "vf"
+  if (lowerTema.startsWith("erl")) return "erl"
+  if (lowerTema.startsWith("cren")) return "cren"
+  if (lowerTema.startsWith("ibi")) return "ibi"
+  if (lowerTema.startsWith("nspr")) return "nspr"
+  return "Other"
+}
+
+export default function AdminPage() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [passwordInput, setPasswordInput] = useState("")
+  const [passwordError, setPasswordError] = useState(false)
+
+  const [uploadState, setUploadState] = useState<UploadState>({
+    status: "idle",
+    progress: 0,
+  })
+  const [selectedSemester, setSelectedSemester] = useState<Semester>("T1")
+  const [selectedExamType, setSelectedExamType] = useState<ExamType>("regular")
+  const [selectedPeriod, setSelectedPeriod] = useState<ExamPeriod>("VT24")
+  const [extractedQuestions, setExtractedQuestions] = useState<ExtractedQuestion[]>([])
+  const [editingQuestion, setEditingQuestion] = useState<ExtractedQuestion | null>(null)
+  const [availableQuestions, setAvailableQuestions] = useState<Question[]>([])
+  const [editingAvailableQuestion, setEditingAvailableQuestion] = useState<Question | null>(null)
+  const [feedbackList, setFeedbackList] = useState<QuestionFeedback[]>([])
+
+  const loadAvailableQuestions = useCallback(() => {
+    if (typeof window === "undefined") return
+    const deleted = getDeletedQuestionIds()
+    const custom = getCustomQuestions()
+    const mockFiltered = mockQuestions.filter((q) => !deleted.includes(q.id))
+    setAvailableQuestions([...mockFiltered, ...custom])
+  }, [])
+
+  const loadFeedback = useCallback(() => {
+    if (typeof window === "undefined") return
+    setFeedbackList(getFeedback())
+  }, [])
+
+  useEffect(() => {
+    loadAvailableQuestions()
+  }, [loadAvailableQuestions])
+
+  useEffect(() => {
+    loadFeedback()
+  }, [loadFeedback])
+
+  const handleFileUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // Check file type
+    const validTypes = [
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "application/vnd.ms-excel",
+    ]
+    const isExcel = validTypes.includes(file.type) || file.name.endsWith(".xlsx") || file.name.endsWith(".xls")
+
+    if (!isExcel) {
+      setUploadState({
+        status: "error",
+        progress: 0,
+        error: "Vänligen ladda upp en Excel-fil (.xlsx eller .xls)",
+      })
+      return
+    }
+
+    setUploadState({
+      status: "uploading",
+      progress: 0,
+      fileName: file.name,
+    })
+
+    try {
+      // Read file as ArrayBuffer
+      const arrayBuffer = await file.arrayBuffer()
+      setUploadState((prev) => ({ ...prev, progress: 30 }))
+
+      // Parse Excel file
+      const workbook = XLSX.read(arrayBuffer, { type: "array" })
+      setUploadState((prev) => ({ ...prev, progress: 50, status: "processing" }))
+
+      // Get the first sheet
+      const sheetName = workbook.SheetNames[0]
+      const worksheet = workbook.Sheets[sheetName]
+
+      // Convert to JSON - expecting columns: frågnummer, tema, fråga, svarförslag
+      const data = XLSX.utils.sheet_to_json<string[]>(worksheet, { header: 1 })
+
+      setUploadState((prev) => ({ ...prev, progress: 70 }))
+
+      // Skip header row (first row contains column names)
+      const rows = data.slice(1)
+
+      // Parse questions from rows
+      const extractedQs: ExtractedQuestion[] = []
+
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i] as any[]
+        if (!row) continue
+
+        // Manually map row array to a string-based object as requested
+        // columns: question_id, theme, interaction, question_text, options, correct_answer
+        const excelRow = {
+          qId: row[0] != null ? String(row[0]) : "",
+          theme: row[1] != null ? String(row[1]) : "",
+          interaction: row[2] != null ? String(row[2]) : "show_answer",
+          qText: row[3] != null ? String(row[3]) : "",
+          optionsStr: row[4] != null ? String(row[4]) : "",
+          correctAnsStr: row[5] != null ? String(row[5]) : "",
+        }
+
+        if (excelRow.qText.trim() === "") continue
+
+        const interaction = (excelRow.interaction.trim().toLowerCase() === "check_answers" || excelRow.interaction.trim().toLowerCase().includes("sant eller falskt"))
+          ? "check_answers" as const
+          : "show_answer" as const
+
+        // Parse options (pipe separated)
+        let options: string[] | undefined
+        if (excelRow.optionsStr) {
+          options = excelRow.optionsStr.split("|").map((s: string) => s.trim()).filter(Boolean)
+        }
+
+        // Parse correct answer as keys (a, b, c...)
+        let correctAnswer: string | string[]
+        if (interaction === "check_answers") {
+          // Split by either pipe or comma, then lowercase to handle 'A', 'a', etc.
+          correctAnswer = excelRow.correctAnsStr.split(/[|,]/).map((s: string) => s.trim().toLowerCase()).filter(Boolean)
+        } else {
+          correctAnswer = excelRow.correctAnsStr.trim()
+        }
+
+        extractedQs.push({
+          id: `eq${i + 1}`,
+          questionNumber: excelRow.qId || `${i + 1}`,
+          theme: excelRow.theme,
+          interaction,
+          questionText: excelRow.qText.trim(),
+          options,
+          correctAnswer,
+          status: "pending" as const,
+        })
+
+        // Update progress
+        const progress = 70 + Math.floor((i / rows.length) * 25)
+        setUploadState((prev) => ({ ...prev, progress }))
+      }
+
+      if (extractedQs.length === 0) {
+        setUploadState({
+          status: "error",
+          progress: 0,
+          error: "Inga frågor hittades i Excel-filen. Kontrollera att filen har kolumner: question_id, theme, interaction, question_text, options, correct_answer",
+        })
+        return
+      }
+
+      setExtractedQuestions(extractedQs)
+      setUploadState((prev) => ({ ...prev, status: "complete", progress: 100 }))
+    } catch (error) {
+      console.error("Excel processing error:", error)
+      setUploadState({
+        status: "error",
+        progress: 0,
+        error: "Kunde inte läsa Excel-filen. Kontrollera att filen inte är skadad.",
+      })
+    }
+  }, [])
+
+  const handleApprove = (questionId: string) => {
+    setExtractedQuestions((prev) =>
+      prev.map((q) => (q.id === questionId ? { ...q, status: "approved" as const } : q))
+    )
+  }
+
+  const handleReject = (questionId: string) => {
+    setExtractedQuestions((prev) =>
+      prev.map((q) => (q.id === questionId ? { ...q, status: "rejected" as const } : q))
+    )
+  }
+
+  const handleEdit = (question: ExtractedQuestion) => {
+    setEditingQuestion({ ...question })
+  }
+
+  const handleSaveEdit = () => {
+    if (!editingQuestion) return
+
+    let finalAnswer = editingQuestion.correctAnswer
+    if (typeof finalAnswer === "string" && finalAnswer.trim().startsWith("[")) {
+      try {
+        finalAnswer = JSON.parse(finalAnswer)
+      } catch (e) {
+        console.warn("Could not parse correctAnswer as JSON, keeping as string")
+      }
+    }
+
+    setExtractedQuestions((prev) =>
+      prev.map((q) =>
+        q.id === editingQuestion.id
+          ? { ...editingQuestion, correctAnswer: finalAnswer, status: "approved" as const }
+          : q
+      )
+    )
+    setEditingQuestion(null)
+  }
+
+  const handleSaveAll = () => {
+    const approved = extractedQuestions.filter((q) => q.status === "approved")
+
+    if (approved.length === 0) {
+      return
+    }
+
+    // Map approved extracted questions to the shared Question type
+    const newQuestions: Question[] = approved.map((q, index) => ({
+      id: `custom-${Date.now()}-${index}`,
+      semester: selectedSemester,
+      examType: selectedExamType,
+      examDate: "",
+      examPeriod: selectedPeriod,
+      subjectArea: mapSubjectToArea(q.theme),
+      questionNumber: Number(q.questionNumber) || index + 1,
+      questionText: q.questionText,
+      interaction: q.interaction,
+      options: q.options,
+      correctAnswer: q.correctAnswer,
+      answer: Array.isArray(q.correctAnswer) ? q.correctAnswer.join(", ") : (q.correctAnswer as string),
+    }))
+
+    if (typeof window !== "undefined") {
+      try {
+        const existing = getCustomQuestions()
+        const merged = [...existing, ...newQuestions]
+        setCustomQuestions(merged)
+        loadAvailableQuestions()
+        alert(`${newQuestions.length} frågor sparades och kommer visas under Övningsfrågor på denna enhet.`)
+      } catch (error) {
+        console.error("Failed to save questions to localStorage", error)
+        alert("Kunde inte spara frågorna lokalt i webbläsaren.")
+      }
+    }
+  }
+
+  const handleDeleteAvailable = (questionId: string) => {
+    if (typeof window === "undefined") return
+    if (questionId.startsWith("custom-")) {
+      const custom = getCustomQuestions().filter((q) => q.id !== questionId)
+      setCustomQuestions(custom)
+    } else {
+      const deleted = getDeletedQuestionIds()
+      if (!deleted.includes(questionId)) {
+        setDeletedQuestionIds([...deleted, questionId])
+      }
+    }
+    loadAvailableQuestions()
+  }
+
+  const handleEditAvailable = (question: Question) => {
+    setEditingAvailableQuestion({ ...question })
+  }
+
+  const handleSaveEditAvailable = () => {
+    if (!editingAvailableQuestion || typeof window === "undefined") return
+
+    let finalAnswer = editingAvailableQuestion.correctAnswer
+    if (typeof finalAnswer === "string" && finalAnswer.trim().startsWith("[")) {
+      try {
+        finalAnswer = JSON.parse(finalAnswer)
+      } catch (e) {
+        console.warn("Could not parse correctAnswer as JSON, keeping as string")
+      }
+    }
+
+    const custom = getCustomQuestions()
+    const updatedQuestion = { ...editingAvailableQuestion, correctAnswer: finalAnswer }
+
+    if (editingAvailableQuestion.id.startsWith("custom-")) {
+      const updated = custom.map((q) =>
+        q.id === editingAvailableQuestion.id ? updatedQuestion : q
+      )
+      setCustomQuestions(updated)
+    } else {
+      setDeletedQuestionIds([...getDeletedQuestionIds(), editingAvailableQuestion.id])
+      const newQuestion: Question = {
+        ...updatedQuestion,
+        id: `custom-${Date.now()}-0`,
+      }
+      setCustomQuestions([...custom, newQuestion])
+    }
+    loadAvailableQuestions()
+    setEditingAvailableQuestion(null)
+  }
+
+  const resetUpload = () => {
+    setUploadState({ status: "idle", progress: 0 })
+    setExtractedQuestions([])
+  }
+
+  const approvedCount = extractedQuestions.filter((q) => q.status === "approved").length
+  const pendingCount = extractedQuestions.filter((q) => q.status === "pending").length
+
+  const handleFeedbackStatusChange = (feedbackId: string, status: FeedbackStatus) => {
+    if (typeof window === "undefined") return
+    updateFeedbackStatus(feedbackId, status)
+    loadFeedback()
+  }
+
+  const handlePasswordSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (passwordInput === ADMIN_PASSWORD) {
+      setIsAuthenticated(true)
+      setPasswordError(false)
+    } else {
+      setPasswordError(true)
+    }
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="flex min-h-screen flex-col">
+        <Header />
+        <main className="flex-1 flex items-center justify-center">
+          <Card className="w-full max-w-md mx-4">
+            <CardHeader className="text-center">
+              <div className="flex justify-center mb-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-secondary">
+                  <Lock className="h-6 w-6 text-muted-foreground" />
+                </div>
+              </div>
+              <CardTitle>Adminåtkomst</CardTitle>
+              <CardDescription>
+                Ange adminlösenordet för att fortsätta.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handlePasswordSubmit} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="password">Lösenord</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    value={passwordInput}
+                    onChange={(e) => {
+                      setPasswordInput(e.target.value)
+                      setPasswordError(false)
+                    }}
+                    placeholder="Ange adminlösenord"
+                    className={passwordError ? "border-destructive" : ""}
+                  />
+                  {passwordError && (
+                    <p className="text-sm text-destructive">Felaktigt lösenord</p>
+                  )}
+                </div>
+                <Button type="submit" className="w-full">
+                  Öppna adminpanelen
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+        </main>
+        <Footer />
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex min-h-screen flex-col">
+      <Header />
+
+      <main className="flex-1">
+        <div className="mx-auto max-w-5xl px-4 py-8">
+          {/* Page Header */}
+          <div className="mb-8">
+            <div className="flex items-center gap-2 mb-2">
+              <Badge variant="outline" className="text-xs">Admin</Badge>
+            </div>
+            <h1 className="text-3xl font-bold tracking-tight text-foreground">
+              Tentahantering
+            </h1>
+            <p className="mt-2 text-muted-foreground">
+              Ladda upp Excel-filer med tentafrågor och granska innan publicering.
+            </p>
+          </div>
+
+          <Tabs defaultValue="upload" className="space-y-6">
+            <TabsList>
+              <TabsTrigger value="upload">Ladda upp frågor</TabsTrigger>
+              <TabsTrigger value="review" disabled={extractedQuestions.length === 0}>
+                Granska frågor
+                {extractedQuestions.length > 0 && (
+                  <Badge variant="secondary" className="ml-2">
+                    {extractedQuestions.length}
+                  </Badge>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="manage" className="gap-2">
+                <List className="h-4 w-4" />
+                Befintliga frågor
+                <Badge variant="secondary" className="ml-1">
+                  {availableQuestions.length}
+                </Badge>
+              </TabsTrigger>
+              <TabsTrigger value="feedback" className="gap-2">
+                <MessageSquare className="h-4 w-4" />
+                Feedback
+                {feedbackList.filter((f) => f.status === "new").length > 0 && (
+                  <Badge variant="destructive" className="ml-1">
+                    {feedbackList.filter((f) => f.status === "new").length}
+                  </Badge>
+                )}
+              </TabsTrigger>
+            </TabsList>
+
+            {/* Upload Tab */}
+            <TabsContent value="upload" className="space-y-6">
+              {/* Exam Metadata */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Tentadetaljer</CardTitle>
+                  <CardDescription>
+                    Ange termin, tentaTyp och datum innan uppladdning.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-4 sm:grid-cols-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="semester">Termin</Label>
+                      <Select
+                        value={selectedSemester}
+                        onValueChange={(v) => setSelectedSemester(v as Semester)}
+                      >
+                        <SelectTrigger id="semester">
+                          <SelectValue placeholder="Välj termin" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {["T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8", "T9", "T10"].map((s) => (
+                            <SelectItem key={s} value={s}>
+                              {s}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="examType">TentaTyp</Label>
+                      <Select
+                        value={selectedExamType}
+                        onValueChange={(v) => setSelectedExamType(v as ExamType)}
+                      >
+                        <SelectTrigger id="examType">
+                          <SelectValue placeholder="Välj typ" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="regular">Ordinarie tenta</SelectItem>
+                          <SelectItem value="re-exam">Omtenta</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="examPeriod">Tentaperiod</Label>
+                      <Select
+                        value={selectedPeriod}
+                        onValueChange={(v) => setSelectedPeriod(v as ExamPeriod)}
+                      >
+                        <SelectTrigger id="examPeriod">
+                          <SelectValue placeholder="Välj period" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {EXAM_PERIODS.map((p) => (
+                            <SelectItem key={p} value={p}>
+                              {p}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Upload Area */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Ladda upp Excel-fil</CardTitle>
+                  <CardDescription>
+                    Excel-filen ska ha 4 kolumner: frågnummer, tema, fråga, svarförslag
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {uploadState.status === "idle" && (
+                    <label
+                      htmlFor="excel-upload"
+                      className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-border bg-secondary/30 p-12 cursor-pointer hover:bg-secondary/50 transition-colors"
+                    >
+                      <Upload className="h-10 w-10 text-muted-foreground mb-4" />
+                      <p className="text-sm font-medium text-foreground">
+                        Klicka för att ladda upp eller dra och släpp
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">Excel-filer (.xlsx, .xls)</p>
+                      <input
+                        id="excel-upload"
+                        type="file"
+                        accept=".xlsx,.xls"
+                        className="sr-only"
+                        onChange={handleFileUpload}
+                      />
+                    </label>
+                  )}
+
+                  {(uploadState.status === "uploading" || uploadState.status === "processing") && (
+                    <div className="flex flex-col items-center justify-center rounded-lg border border-border bg-card p-12">
+                      <Loader2 className="h-10 w-10 text-accent animate-spin mb-4" />
+                      <p className="text-sm font-medium text-foreground">
+                        {uploadState.status === "uploading"
+                          ? "Laddar upp..."
+                          : "Bearbetar Excel-filen..."}
+                      </p>
+                      <div className="w-full max-w-xs mt-4">
+                        <div className="h-2 rounded-full bg-secondary overflow-hidden">
+                          <div
+                            className="h-full bg-accent transition-all duration-300"
+                            style={{ width: `${uploadState.progress}%` }}
+                          />
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-2 text-center">
+                          {uploadState.progress}%
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {uploadState.status === "complete" && (
+                    <div className="flex flex-col items-center justify-center rounded-lg border border-accent/30 bg-accent/5 p-12">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-accent/20 mb-4">
+                        <Check className="h-6 w-6 text-accent" />
+                      </div>
+                      <p className="text-sm font-medium text-foreground">
+                        Inläsning klar!
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {extractedQuestions.length} frågor lästes in från{" "}
+                        {uploadState.fileName}
+                      </p>
+                      <div className="flex gap-2 mt-4">
+                        <Button variant="outline" size="sm" onClick={resetUpload}>
+                          Ladda upp en till
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {uploadState.status === "error" && (
+                    <div className="flex flex-col items-center justify-center rounded-lg border border-destructive/30 bg-destructive/5 p-12">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-destructive/20 mb-4">
+                        <AlertCircle className="h-6 w-6 text-destructive" />
+                      </div>
+                      <p className="text-sm font-medium text-foreground">
+                        Uppladdningen misslyckades
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1 text-center max-w-md">
+                        {uploadState.error}
+                      </p>
+                      <Button variant="outline" size="sm" className="mt-4 bg-transparent" onClick={resetUpload}>
+                        Försök igen
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Format Help */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Filformat</CardTitle>
+                  <CardDescription>
+                    Så här ska din Excel-fil se ut
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm border border-border rounded-lg">
+                      <thead>
+                        <tr className="bg-secondary/50">
+                          <th className="px-3 py-2 text-left font-medium border-b border-r border-border">question_id</th>
+                          <th className="px-3 py-2 text-left font-medium border-b border-r border-border">theme</th>
+                          <th className="px-3 py-2 text-left font-medium border-b border-r border-border">interaction</th>
+                          <th className="px-3 py-2 text-left font-medium border-b border-r border-border">question_text</th>
+                          <th className="px-3 py-2 text-left font-medium border-b border-r border-border">options</th>
+                          <th className="px-3 py-2 text-left font-medium border-b border-r border-border">correct_answer</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td className="px-3 py-2 border-b border-r border-border font-mono text-xs">1</td>
+                          <td className="px-3 py-2 border-b border-r border-border italic text-xs">Anatomi</td>
+                          <td className="px-3 py-2 border-b border-r border-border text-xs">check_answers</td>
+                          <td className="px-3 py-2 border-b border-r border-border text-xs italic">Vilken nerv...</td>
+                          <td className="px-3 py-2 border-b border-r border-border text-xs">Val A | Val B | Val C</td>
+                          <td className="px-3 py-2 border-b border-r border-border text-xs">a</td>
+                        </tr>
+                        <tr className="bg-secondary/20">
+                          <td className="px-3 py-2 border-r border-border text-muted-foreground">2</td>
+                          <td className="px-3 py-2 border-r border-border text-muted-foreground">Fysiologi</td>
+                          <td className="px-3 py-2 border-r border-border text-muted-foreground">drag_and_drop</td>
+                          <td className="px-3 py-2 border-r border-border text-muted-foreground">Para ihop...</td>
+                          <td className="px-3 py-2 border-r border-border text-muted-foreground">-</td>
+                          <td className="px-3 py-2 border-r border-border text-muted-foreground">A:1, B:2</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Review Tab */}
+            <TabsContent value="review" className="space-y-6">
+              {/* Summary */}
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-6">
+                      <div>
+                        <p className="text-2xl font-bold text-foreground">{extractedQuestions.length}</p>
+                        <p className="text-xs text-muted-foreground">Totalt antal frågor</p>
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold text-accent">{approvedCount}</p>
+                        <p className="text-xs text-muted-foreground">Godkända</p>
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold text-muted-foreground">{pendingCount}</p>
+                        <p className="text-xs text-muted-foreground">Väntande</p>
+                      </div>
+                    </div>
+                    <Button
+                      onClick={handleSaveAll}
+                      disabled={approvedCount === 0}
+                    >
+                      Spara {approvedCount} frågor
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Question List */}
+              <div className="space-y-4">
+                {extractedQuestions.map((question) => (
+                  <Card key={question.id} className={
+                    question.status === "approved"
+                      ? "border-accent/50"
+                      : question.status === "rejected"
+                        ? "border-destructive/50 opacity-60"
+                        : ""
+                  }>
+                    <CardContent className="pt-6">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1 space-y-3">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="text-xs">
+                              Fråga {question.questionNumber}
+                            </Badge>
+                            <Badge variant="secondary" className="text-xs">
+                              {question.theme}
+                            </Badge>
+                            <Badge variant="outline" className="text-xs">
+                              {question.interaction}
+                            </Badge>
+                            {question.status === "approved" && (
+                              <Badge className="bg-accent text-accent-foreground text-xs">Godkänd</Badge>
+                            )}
+                            {question.status === "rejected" && (
+                              <Badge variant="destructive" className="text-xs">Avvisad</Badge>
+                            )}
+                          </div>
+
+                          <div>
+                            <p className="font-medium text-foreground">{question.questionText}</p>
+                          </div>
+
+                          <div className="rounded-lg bg-secondary/50 p-3">
+                            <div>
+                              <p className="text-xs font-medium text-muted-foreground mb-1">Korrekt svar / Alternativ:</p>
+                              <p className="text-sm text-foreground">
+                                {Array.isArray(question.correctAnswer)
+                                  ? question.correctAnswer.join(", ")
+                                  : question.correctAnswer?.toString()}
+                                {question.options && ` (Alternativ: ${question.options.join(", ")})`}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {question.status === "pending" && (
+                          <div className="flex flex-col gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="bg-transparent"
+                              onClick={() => handleApprove(question.id)}
+                            >
+                              <Check className="h-4 w-4 mr-1" />
+                              Godkänn
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="bg-transparent"
+                              onClick={() => handleEdit(question)}
+                            >
+                              <Edit2 className="h-4 w-4 mr-1" />
+                              Redigera
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-destructive hover:text-destructive bg-transparent"
+                              onClick={() => handleReject(question.id)}
+                            >
+                              <X className="h-4 w-4 mr-1" />
+                              Avvisa
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </TabsContent>
+
+            {/* Manage Tab - Edit/Delete available questions */}
+            <TabsContent value="manage" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Hantera befintliga frågor</CardTitle>
+                  <CardDescription>
+                    Redigera eller ta bort frågor som visas på Övningsfrågor-sidan.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {availableQuestions.length === 0 ? (
+                    <p className="text-sm text-muted-foreground py-8 text-center">
+                      Inga frågor att hantera. Ladda upp frågor eller spara godkända frågor från granskningsfliken.
+                    </p>
+                  ) : (
+                    <div className="space-y-4">
+                      {availableQuestions.map((question) => (
+                        <Card key={question.id} className="border-border">
+                          <CardContent className="pt-6">
+                            <div className="flex items-start justify-between gap-4">
+                              <div className="flex-1 space-y-2">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <Badge variant="outline" className="text-xs">
+                                    {question.semester} · {question.examType === "regular" ? "Ordinarie" : "Omtenta"}
+                                  </Badge>
+                                  <Badge variant="secondary" className="text-xs">
+                                    {subjectLabels[question.subjectArea]}
+                                  </Badge>
+                                  {question.id.startsWith("custom-") && (
+                                    <Badge variant="outline" className="text-xs text-muted-foreground">
+                                      Egna
+                                    </Badge>
+                                  )}
+                                </div>
+                                <p className="font-medium text-foreground line-clamp-2">{question.questionText}</p>
+                                <p className="text-sm text-muted-foreground line-clamp-1">{question.answer}</p>
+                              </div>
+                              <div className="flex gap-2 shrink-0">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="bg-transparent"
+                                  onClick={() => handleEditAvailable(question)}
+                                >
+                                  <Edit2 className="h-4 w-4 mr-1" />
+                                  Redigera
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-destructive hover:text-destructive hover:bg-destructive/10 bg-transparent"
+                                  onClick={() => handleDeleteAvailable(question.id)}
+                                >
+                                  <Trash2 className="h-4 w-4 mr-1" />
+                                  Ta bort
+                                </Button>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Feedback Tab */}
+            <TabsContent value="feedback" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Feedback från studenter</CardTitle>
+                  <CardDescription>
+                    Studentfeedback kopplad till frågor. Markera som läst eller löst när du gjort ändringar.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {feedbackList.length === 0 ? (
+                    <p className="text-sm text-muted-foreground py-8 text-center">
+                      Ingen feedback ännu. Studenter kan skicka feedback via knappen &quot;Skriv feedback&quot; på varje fråga.
+                    </p>
+                  ) : (
+                    <div className="space-y-4">
+                      {feedbackList.map((fb) => (
+                        <Card
+                          key={fb.id}
+                          className={
+                            fb.status === "new"
+                              ? "border-accent/50 bg-accent/5"
+                              : fb.status === "resolved"
+                                ? "opacity-75 border-muted"
+                                : "border-border"
+                          }
+                        >
+                          <CardContent className="pt-6">
+                            <div className="flex items-start justify-between gap-4">
+                              <div className="flex-1 space-y-2 min-w-0">
+                                <p className="text-xs text-muted-foreground">
+                                  Fråga: {fb.questionPreview}
+                                </p>
+                                <p className="text-sm font-medium text-foreground">
+                                  {fb.feedbackText}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {new Date(fb.createdAt).toLocaleString("sv-SE")}
+                                  {fb.questionId && (
+                                    <span className="ml-2">· Fråga-ID: {fb.questionId}</span>
+                                  )}
+                                </p>
+                              </div>
+                              <div className="flex flex-wrap gap-2 shrink-0">
+                                {fb.status === "new" && (
+                                  <>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => handleFeedbackStatusChange(fb.id, "read")}
+                                    >
+                                      Markera som läst
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      onClick={() => handleFeedbackStatusChange(fb.id, "resolved")}
+                                    >
+                                      Markera som löst
+                                    </Button>
+                                  </>
+                                )}
+                                {fb.status === "read" && (
+                                  <>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => handleFeedbackStatusChange(fb.id, "new")}
+                                    >
+                                      Tillbaka till ny
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      onClick={() => handleFeedbackStatusChange(fb.id, "resolved")}
+                                    >
+                                      Markera som löst
+                                    </Button>
+                                  </>
+                                )}
+                                {fb.status === "resolved" && (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => handleFeedbackStatusChange(fb.id, "read")}
+                                  >
+                                    Öppna igen
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                            <div className="mt-2">
+                              <Badge
+                                variant={
+                                  fb.status === "new"
+                                    ? "default"
+                                    : fb.status === "resolved"
+                                      ? "secondary"
+                                      : "outline"
+                                }
+                                className="text-xs"
+                              >
+                                {fb.status === "new"
+                                  ? "Ny"
+                                  : fb.status === "read"
+                                    ? "Läst"
+                                    : "Löst"}
+                              </Badge>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        </div>
+      </main>
+
+      {/* Edit Modal for available questions */}
+      {editingAvailableQuestion && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <CardHeader>
+              <CardTitle>Redigera fråga</CardTitle>
+              <CardDescription>
+                Ändringar sparas och visas direkt på Övningsfrågor-sidan.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="avail-edit-question">Fråga</Label>
+                <Textarea
+                  id="avail-edit-question"
+                  value={editingAvailableQuestion.questionText}
+                  onChange={(e) =>
+                    setEditingAvailableQuestion((prev) =>
+                      prev ? { ...prev, questionText: e.target.value } : null
+                    )
+                  }
+                  rows={3}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="avail-edit-answer">Korrekt svar (text eller JSON)</Label>
+                <Textarea
+                  id="avail-edit-answer"
+                  value={Array.isArray(editingAvailableQuestion.correctAnswer) ? JSON.stringify(editingAvailableQuestion.correctAnswer) : editingAvailableQuestion.correctAnswer?.toString()}
+                  onChange={(e) =>
+                    setEditingAvailableQuestion((prev) =>
+                      prev ? { ...prev, correctAnswer: e.target.value, answer: e.target.value } : null
+                    )
+                  }
+                  rows={2}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="avail-edit-interaction">Interaktion</Label>
+                <Select
+                  value={editingAvailableQuestion.interaction}
+                  onValueChange={(v) =>
+                    setEditingAvailableQuestion((prev) =>
+                      prev ? { ...prev, interaction: v as InteractionType } : null
+                    )
+                  }
+                >
+                  <SelectTrigger id="avail-edit-interaction">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="show_answer">Visa svar</SelectItem>
+                    <SelectItem value="check_answers">Rätta svar</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="avail-edit-options">Alternativ (separerade med |)</Label>
+                <Input
+                  id="avail-edit-options"
+                  value={editingAvailableQuestion.options?.join(" | ") || ""}
+                  onChange={(e) =>
+                    setEditingAvailableQuestion((prev) =>
+                      prev ? { ...prev, options: e.target.value.split("|").map(s => s.trim()).filter(Boolean) } : null
+                    )
+                  }
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="avail-edit-subject">Ämnesområde</Label>
+                  <Select
+                    value={editingAvailableQuestion.subjectArea}
+                    onValueChange={(v) =>
+                      setEditingAvailableQuestion((prev) =>
+                        prev ? { ...prev, subjectArea: v as SubjectArea } : null
+                      )
+                    }
+                  >
+                    <SelectTrigger id="avail-edit-subject">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {subjects.map((subject) => (
+                        <SelectItem key={subject} value={subject}>
+                          {subjectLabels[subject]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="avail-edit-number">Frågnummer</Label>
+                  <Input
+                    id="avail-edit-number"
+                    type="number"
+                    min={1}
+                    value={editingAvailableQuestion.questionNumber}
+                    onChange={(e) =>
+                      setEditingAvailableQuestion((prev) =>
+                        prev ? { ...prev, questionNumber: parseInt(e.target.value, 10) || 1 } : null
+                      )
+                    }
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="avail-edit-semester">Termin</Label>
+                  <Select
+                    value={editingAvailableQuestion.semester}
+                    onValueChange={(v) =>
+                      setEditingAvailableQuestion((prev) =>
+                        prev ? { ...prev, semester: v as Semester } : null
+                      )
+                    }
+                  >
+                    <SelectTrigger id="avail-edit-semester">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {["T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8", "T9", "T10"].map((s) => (
+                        <SelectItem key={s} value={s}>{s}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="avail-edit-examType">TentaTyp</Label>
+                  <Select
+                    value={editingAvailableQuestion.examType}
+                    onValueChange={(v) =>
+                      setEditingAvailableQuestion((prev) =>
+                        prev ? { ...prev, examType: v as ExamType } : null
+                      )
+                    }
+                  >
+                    <SelectTrigger id="avail-edit-examType">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="regular">Ordinarie</SelectItem>
+                      <SelectItem value="re-exam">Omtenta</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="avail-edit-period">Tentaperiod</Label>
+                  <Select
+                    value={editingAvailableQuestion.examPeriod}
+                    onValueChange={(v) =>
+                      setEditingAvailableQuestion((prev) =>
+                        prev ? { ...prev, examPeriod: v as ExamPeriod } : null
+                      )
+                    }
+                  >
+                    <SelectTrigger id="avail-edit-period">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {EXAM_PERIODS.map((p) => (
+                        <SelectItem key={p} value={p}>{p}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 pt-4">
+                <Button variant="outline" onClick={() => setEditingAvailableQuestion(null)}>
+                  Avbryt
+                </Button>
+                <Button onClick={handleSaveEditAvailable}>
+                  Spara ändringar
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Edit Modal for upload flow */}
+      {editingQuestion && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <CardHeader>
+              <CardTitle>Redigera fråga {editingQuestion.questionNumber}</CardTitle>
+              <CardDescription>
+                Gör ändringar i frågan innan godkännande.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-question">Fråga</Label>
+                <Textarea
+                  id="edit-question"
+                  value={editingQuestion.questionText}
+                  onChange={(e) =>
+                    setEditingQuestion((prev) =>
+                      prev ? { ...prev, questionText: e.target.value } : null
+                    )
+                  }
+                  rows={3}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-answer">Korrekt svar (text eller JSON)</Label>
+                <Textarea
+                  id="edit-answer"
+                  value={Array.isArray(editingQuestion.correctAnswer) ? JSON.stringify(editingQuestion.correctAnswer) : editingQuestion.correctAnswer?.toString()}
+                  onChange={(e) =>
+                    setEditingQuestion((prev) =>
+                      prev ? { ...prev, correctAnswer: e.target.value } : null
+                    )
+                  }
+                  rows={2}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-subject">Tema</Label>
+                  <Input
+                    id="edit-subject"
+                    value={editingQuestion.theme}
+                    onChange={(e) =>
+                      setEditingQuestion((prev) =>
+                        prev ? { ...prev, theme: e.target.value } : null
+                      )
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-interaction">Interaktion</Label>
+                  <Select
+                    value={editingQuestion.interaction}
+                    onValueChange={(v) =>
+                      setEditingQuestion((prev) =>
+                        prev ? { ...prev, interaction: v as InteractionType } : null
+                      )
+                    }
+                  >
+                    <SelectTrigger id="edit-interaction">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="show_answer">Visa svar</SelectItem>
+                      <SelectItem value="check_answers">Rätta svar</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-options">Alternativ (separerade med |)</Label>
+                <Input
+                  id="edit-options"
+                  value={editingQuestion.options?.join(" | ") || ""}
+                  onChange={(e) =>
+                    setEditingQuestion((prev) =>
+                      prev ? { ...prev, options: e.target.value.split("|").map(s => s.trim()).filter(Boolean) } : null
+                    )
+                  }
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-4">
+                <Button
+                  variant="outline"
+                  onClick={() => setEditingQuestion(null)}
+                >
+                  Avbryt
+                </Button>
+                <Button onClick={handleSaveEdit}>
+                  Spara och godkänn
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      <Footer />
+    </div>
+  )
+}

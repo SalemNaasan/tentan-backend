@@ -87,11 +87,26 @@ export default function StudyPage() {
   }, [filteredQuestions, currentPage])
 
   const handleQuestionSelect = (questionId: string, selected: boolean) => {
-
     if (selected) {
       setSelectedQuestions((prev) => [...prev, questionId])
     } else {
       setSelectedQuestions((prev) => prev.filter((id) => id !== questionId))
+    }
+  }
+
+  const handleSelectAll = () => {
+    const allFilteredIds = filteredQuestions.map(q => q.id)
+    const allSelected = allFilteredIds.every(id => selectedQuestions.includes(id))
+
+    if (allSelected) {
+      // Remove all filtered from selection
+      setSelectedQuestions(prev => prev.filter(id => !allFilteredIds.includes(id)))
+    } else {
+      // Add all filtered to selection (avoiding duplicates)
+      setSelectedQuestions(prev => {
+        const newSet = new Set([...prev, ...allFilteredIds])
+        return Array.from(newSet)
+      })
     }
   }
 
@@ -107,7 +122,6 @@ export default function StudyPage() {
       console.error("Error submitting feedback", error)
     }
   }
-
 
   const handleExportAnki = async () => {
     const questionsToExport = questions.filter((q) =>
@@ -288,111 +302,117 @@ export default function StudyPage() {
                   </>
                 )}
 
-              </Button>
+                {/* Anki Export Button */}
+                {selectedQuestions.length > 0 && (
+                  <Button
+                    onClick={handleExportAnki}
+                    className="ml-auto gap-2"
+                  >
+                    <Download className="h-4 w-4" />
+                    Exportera ({selectedQuestions.length})
+                  </Button>
                 )}
 
-              <div className="ml-auto flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleSelectAll}
-                  className="gap-2 text-xs h-9"
-                >
-                  {filteredQuestions.map(q => q.id).every(id => selectedQuestions.includes(id)) ? (
-                    <><CheckSquare className="h-4 w-4" /> Avmarkera alla</>
-                  ) : (
-                    <><Square className="h-4 w-4" /> Markera alla</>
-                  )}
-                </Button>
-              </div>
-            </div>
-
-            {/* Results Count */}
-
-            <div className="mb-4">
-              <p className="text-sm text-muted-foreground">
-                {filteredQuestions.length} fråg{filteredQuestions.length !== 1 ? "or" : "a"} hittades
-              </p>
-            </div>
-
-            {/* Questions List */}
-            <div className="space-y-4">
-              {loading ? (
-                <div className="flex justify-center py-12">
-                  <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
-                </div>
-              ) : filteredQuestions.length > 0 ? (
-
-                paginatedQuestions.map((question) => (
-                  <QuestionCard
-                    key={question.id}
-                    question={question}
-                    isSelected={selectedQuestions.includes(question.id)}
-                    onSelectChange={(selected) =>
-                      handleQuestionSelect(question.id, selected)
-                    }
-                    onFeedbackSubmit={handleFeedbackSubmit}
-                  />
-                ))
-              ) : (
-                <div className="rounded-lg border border-border bg-card p-12 text-center">
-                  <p className="text-muted-foreground">
-                    Inga frågor matchar dina filter. Prova att justera ditt urval.
-                  </p>
+                <div className={selectedQuestions.length > 0 ? "" : "ml-auto"}>
                   <Button
                     variant="outline"
-                    className="mt-4 bg-transparent"
-                    onClick={clearAllFilters}
+                    size="sm"
+                    onClick={handleSelectAll}
+                    className="gap-2 text-xs h-9"
                   >
-                    Rensa filter
+                    {filteredQuestions.length > 0 &&
+                      filteredQuestions.every(q => selectedQuestions.includes(q.id)) ? (
+                      <><CheckSquare className="h-4 w-4" /> Avmarkera alla</>
+                    ) : (
+                      <><Square className="h-4 w-4" /> Markera alla</>
+                    )}
+                  </Button>
+                </div>
+              </div>
+
+              {/* Results Count */}
+              <div className="mb-4">
+                <p className="text-sm text-muted-foreground">
+                  {filteredQuestions.length} fråg{filteredQuestions.length !== 1 ? "or" : "a"} hittades
+                </p>
+              </div>
+
+              {/* Questions List */}
+              <div className="space-y-4">
+                {loading ? (
+                  <div className="flex justify-center py-12">
+                    <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+                  </div>
+                ) : filteredQuestions.length > 0 ? (
+                  paginatedQuestions.map((question) => (
+                    <QuestionCard
+                      key={question.id}
+                      question={question}
+                      isSelected={selectedQuestions.includes(question.id)}
+                      onSelectChange={(selected) =>
+                        handleQuestionSelect(question.id, selected)
+                      }
+                      onFeedbackSubmit={handleFeedbackSubmit}
+                    />
+                  ))
+                ) : (
+                  <div className="rounded-lg border border-border bg-card p-12 text-center">
+                    <p className="text-muted-foreground">
+                      Inga frågor matchar dina filter. Prova att justera ditt urval.
+                    </p>
+                    <Button
+                      variant="outline"
+                      className="mt-4 bg-transparent"
+                      onClick={clearAllFilters}
+                    >
+                      Rensa filter
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              {/* Pagination Controls */}
+              {totalPages > 1 && (
+                <div className="mt-8 flex items-center justify-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+
+                  <div className="flex flex-wrap items-center justify-center gap-1">
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                      <Button
+                        key={page}
+                        variant={currentPage === page ? "default" : "outline"}
+                        size="sm"
+                        className="w-9 h-9"
+                        onClick={() => setCurrentPage(page)}
+                      >
+                        {page}
+                      </Button>
+                    ))}
+                  </div>
+
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                  >
+                    <ChevronRight className="h-4 w-4" />
                   </Button>
                 </div>
               )}
             </div>
-
-            {/* Pagination Controls */}
-            {totalPages > 1 && (
-              <div className="mt-8 flex items-center justify-center gap-2">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-
-                <div className="flex items-center gap-1">
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                    <Button
-                      key={page}
-                      variant={currentPage === page ? "default" : "outline"}
-                      size="sm"
-                      className="w-9 h-9"
-                      onClick={() => setCurrentPage(page)}
-                    >
-                      {page}
-                    </Button>
-                  ))}
-                </div>
-
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                  disabled={currentPage === totalPages}
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-            )}
           </div>
-
         </div>
-    </div>
-      </main >
+      </main>
 
-    <Footer />
-    </div >
+      <Footer />
+    </div>
   )
 }

@@ -16,8 +16,9 @@ import type { Semester, ExamType, ExamPeriod, SubjectArea, Question } from "@/li
 
 // import { addFeedback } from "@/lib/feedback-store"
 
-import { Download, X, Filter, ChevronLeft, ChevronRight, CheckSquare, Square } from "lucide-react"
+import { Download, X, Filter, ChevronLeft, ChevronRight, CheckSquare, Square, Star } from "lucide-react"
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet"
+import { getBookmarkedIds, toggleBookmark as toggleBookmarkInStore } from "@/lib/bookmarks-store"
 
 const PAGE_SIZE = 10
 
@@ -32,6 +33,8 @@ export default function StudyPage() {
   const [selectedQuestions, setSelectedQuestions] = useState<string[]>([])
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
+  const [bookmarkedIds, setBookmarkedIds] = useState<string[]>([])
+  const [showOnlyBookmarked, setShowOnlyBookmarked] = useState(false)
 
 
   const [questions, setQuestions] = useState<Question[]>([])
@@ -46,6 +49,7 @@ export default function StudyPage() {
         if (!res.ok) throw new Error("Failed to fetch")
         const allQuestions = await res.json()
         setQuestions(allQuestions)
+        setBookmarkedIds(getBookmarkedIds())
       } catch (error) {
         console.error("Failed to load questions", error)
       } finally {
@@ -63,6 +67,9 @@ export default function StudyPage() {
   const filteredQuestions = useMemo(() => {
 
     return questions.filter((q) => {
+      if (showOnlyBookmarked && !bookmarkedIds.includes(q.id)) {
+        return false
+      }
       if (selectedSemesters.length > 0 && !selectedSemesters.includes(q.semester)) {
         return false
       }
@@ -189,6 +196,8 @@ export default function StudyPage() {
       setSelectedSubjects={setSelectedSubjects}
       selectedPeriods={selectedPeriods}
       setSelectedPeriods={setSelectedPeriods}
+      showOnlyBookmarked={showOnlyBookmarked}
+      onShowOnlyBookmarkedChange={setShowOnlyBookmarked}
     />
   )
 
@@ -330,11 +339,25 @@ export default function StudyPage() {
                 </div>
               </div>
 
-              {/* Results Count */}
-              <div className="mb-4">
-                <p className="text-sm text-muted-foreground">
-                  {filteredQuestions.length} fråg{filteredQuestions.length !== 1 ? "or" : "a"} hittades
-                </p>
+              {/* Results Count & Selection Counter */}
+              <div className="mb-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <p className="text-sm text-muted-foreground">
+                    {filteredQuestions.length} fråg{filteredQuestions.length !== 1 ? "or" : "a"} hittades
+                  </p>
+                  {selectedQuestions.length > 0 && (
+                    <Badge variant="secondary" className="gap-1.5 py-1 px-3 bg-primary/5 text-primary border-primary/10">
+                      <Download className="h-3 w-3" />
+                      {selectedQuestions.length} markerade
+                    </Badge>
+                  )}
+                  {bookmarkedIds.length > 0 && (
+                    <Badge variant="outline" className="gap-1.5 py-1 px-3">
+                      <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+                      {bookmarkedIds.length} bokmärkta totalt
+                    </Badge>
+                  )}
+                </div>
               </div>
 
               {/* Questions List */}
@@ -353,6 +376,8 @@ export default function StudyPage() {
                         handleQuestionSelect(question.id, selected)
                       }
                       onFeedbackSubmit={handleFeedbackSubmit}
+                      isBookmarked={bookmarkedIds.includes(question.id)}
+                      onToggleBookmark={() => handleToggleBookmark(question.id)}
                     />
                   ))
                 ) : (

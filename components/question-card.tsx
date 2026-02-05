@@ -17,7 +17,7 @@ import {
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import type { Question } from "@/lib/types"
-import { ChevronDown, ChevronUp, Eye, EyeOff, MessageSquare, CheckCircle2, XCircle, RotateCcw } from "lucide-react"
+import { ChevronDown, ChevronUp, Eye, EyeOff, MessageSquare, CheckCircle2, XCircle, RotateCcw, Star } from "lucide-react"
 import { QuestionRenderer } from "./question-renderers/question-renderer"
 import { cn } from "@/lib/utils"
 
@@ -26,6 +26,8 @@ interface QuestionCardProps {
   isSelected: boolean
   onSelectChange: (selected: boolean) => void
   onFeedbackSubmit?: (questionId: string, questionPreview: string, feedbackText: string) => void
+  isBookmarked?: boolean
+  onToggleBookmark?: () => void
 }
 
 export function QuestionCard({
@@ -33,6 +35,8 @@ export function QuestionCard({
   isSelected,
   onSelectChange,
   onFeedbackSubmit,
+  isBookmarked,
+  onToggleBookmark,
 }: QuestionCardProps) {
   const [showAnswer, setShowAnswer] = useState(false)
   const [isExpanded, setIsExpanded] = useState(true)
@@ -118,19 +122,33 @@ export function QuestionCard({
               </p>
             </div>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
-            onClick={() => setIsExpanded(!isExpanded)}
-            aria-label={isExpanded ? "Fäll ihop frågan" : "Expandera frågan"}
-          >
-            {isExpanded ? (
-              <ChevronUp className="h-4 w-4" />
-            ) : (
-              <ChevronDown className="h-4 w-4" />
-            )}
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              className={cn(
+                "h-8 w-8 transition-colors",
+                isBookmarked ? "text-yellow-500 hover:text-yellow-600 hover:bg-yellow-50" : "text-muted-foreground"
+              )}
+              onClick={onToggleBookmark}
+              aria-label={isBookmarked ? "Ta bort bokmärke" : "Bokmärk fråga"}
+            >
+              <Star className={cn("h-4 w-4", isBookmarked && "fill-current")} />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => setIsExpanded(!isExpanded)}
+              aria-label={isExpanded ? "Fäll ihop frågan" : "Expandera frågan"}
+            >
+              {isExpanded ? (
+                <ChevronUp className="h-4 w-4" />
+              ) : (
+                <ChevronDown className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
         </div>
       </CardHeader>
 

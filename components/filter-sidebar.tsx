@@ -82,6 +82,19 @@ export function FilterSidebar({
 
   return (
     <div className="space-y-6">
+      <div className="pb-4 border-b border-border">
+        <label className="flex items-center gap-2 cursor-pointer group">
+          <Checkbox
+            checked={showOnlyBookmarked}
+            onCheckedChange={onShowOnlyBookmarkedChange}
+          />
+          <div className="flex items-center gap-1.5 text-sm font-medium transition-colors group-hover:text-primary">
+            <Star className={cn("h-4 w-4", showOnlyBookmarked ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground")} />
+            Visa endast bokmärkta
+          </div>
+        </label>
+      </div>
+
       <div>
         <h3 className="mb-3 text-sm font-semibold text-foreground uppercase tracking-wide">
           Termin

@@ -9,16 +9,29 @@ interface QuestionRendererProps {
     userAnswer: any
     onAnswerChange: (answer: any) => void
     disabled?: boolean
+    showCorrect?: boolean
 }
 
-export function QuestionRenderer({ question, userAnswer, onAnswerChange, disabled }: QuestionRendererProps) {
+export function QuestionRenderer({
+    question,
+    userAnswer,
+    onAnswerChange,
+    disabled,
+    showCorrect
+}: QuestionRendererProps) {
     if (question.interaction === "check_answers") {
+        const correctAnswers = Array.isArray(question.correctAnswer)
+            ? question.correctAnswer
+            : [question.correctAnswer as string]
+
         return (
             <CheckAnswersRenderer
                 options={question.options || []}
                 value={userAnswer as string[] || []}
                 onChange={onAnswerChange}
                 disabled={disabled}
+                showCorrect={showCorrect}
+                correctAnswers={correctAnswers}
             />
         )
     }

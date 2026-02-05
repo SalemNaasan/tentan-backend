@@ -43,6 +43,8 @@ export function QuestionCard({
   const [userAnswer, setUserAnswer] = useState<any>(null)
   const [isChecked, setIsChecked] = useState(false)
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null)
+  const [showCorrectAnswer, setShowCorrectAnswer] = useState(false)
+
 
   const handleFeedbackSubmit = () => {
     const text = feedbackText.trim()
@@ -75,7 +77,9 @@ export function QuestionCard({
     setIsChecked(false)
     setIsCorrect(null)
     setShowAnswer(false)
+    setShowCorrectAnswer(false)
   }
+
 
   return (
     <Card className={cn(
@@ -147,7 +151,9 @@ export function QuestionCard({
                 userAnswer={userAnswer}
                 onAnswerChange={setUserAnswer}
                 disabled={isChecked}
+                showCorrect={showCorrectAnswer}
               />
+
             </div>
 
             {/* Check Result Feedback */}
@@ -189,14 +195,26 @@ export function QuestionCard({
                       Rätta svar
                     </Button>
                   ) : (
-                    <Button
-                      variant="outline"
-                      onClick={handleReset}
-                      className="gap-2"
-                    >
-                      <RotateCcw className="h-4 w-4" />
-                      Gör om
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        onClick={handleReset}
+                        className="gap-2"
+                      >
+                        <RotateCcw className="h-4 w-4" />
+                        Gör om
+                      </Button>
+                      {!isCorrect && !showCorrectAnswer && (
+                        <Button
+                          variant="outline"
+                          onClick={() => setShowCorrectAnswer(true)}
+                          className="gap-2 border-green-200 hover:bg-green-50 text-green-700"
+                        >
+                          <Eye className="h-4 w-4" />
+                          Visa svar
+                        </Button>
+                      )}
+                    </div>
                   )
                 ) : (
                   <Button

@@ -27,7 +27,8 @@ import { EXAM_PERIODS } from "@/lib/types"
 //   setDeletedQuestionIds,
 // } from "@/lib/questions-store"
 
-import { getFeedback, updateFeedbackStatus } from "@/lib/feedback-store"
+// import { getFeedback, updateFeedbackStatus } from "@/lib/feedback-store"
+
 
 const ADMIN_PASSWORD = "salem"
 
@@ -108,10 +109,17 @@ export default function AdminPage() {
     }
   }, [])
 
-  const loadFeedback = useCallback(() => {
-    if (typeof window === "undefined") return
-    setFeedbackList(getFeedback())
+  const loadFeedback = useCallback(async () => {
+    try {
+      const res = await fetch("/api/feedback", { cache: "no-store" })
+      if (!res.ok) throw new Error("Failed to fetch")
+      const data = await res.json()
+      setFeedbackList(data)
+    } catch (error) {
+      console.error("Failed to load feedback", error)
+    }
   }, [])
+
 
   useEffect(() => {
     loadAvailableQuestions()
@@ -371,11 +379,20 @@ export default function AdminPage() {
   const approvedCount = extractedQuestions.filter((q) => q.status === "approved").length
   const pendingCount = extractedQuestions.filter((q) => q.status === "pending").length
 
-  const handleFeedbackStatusChange = (feedbackId: string, status: FeedbackStatus) => {
-    if (typeof window === "undefined") return
-    updateFeedbackStatus(feedbackId, status)
-    loadFeedback()
+  const handleFeedbackStatusChange = async (feedbackId: string, status: FeedbackStatus) => {
+    try {
+      const res = await fetch("/api/feedback", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: feedbackId, status })
+      })
+      if (!res.ok) throw new Error("Failed to update status")
+      await loadFeedback()
+    } catch (error) {
+      console.error("Failed to update feedback status", error)
+    }
   }
+
 
   const handlePasswordSubmit = (e: React.FormEvent) => {
     e.preventDefault()

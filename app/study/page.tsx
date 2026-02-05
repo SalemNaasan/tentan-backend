@@ -14,7 +14,8 @@ import { Badge } from "@/components/ui/badge"
 import type { Semester, ExamType, ExamPeriod, SubjectArea, Question } from "@/lib/types"
 // import { getCustomQuestions, getDeletedQuestionIds } from "@/lib/questions-store"
 
-import { addFeedback } from "@/lib/feedback-store"
+// import { addFeedback } from "@/lib/feedback-store"
+
 import { Download, X, Filter } from "lucide-react"
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet"
 
@@ -75,10 +76,19 @@ export default function StudyPage() {
     }
   }
 
-  const handleFeedbackSubmit = (questionId: string, questionPreview: string, feedbackText: string) => {
-    if (typeof window === "undefined") return
-    addFeedback({ questionId, questionPreview, feedbackText })
+  const handleFeedbackSubmit = async (questionId: string, questionPreview: string, feedbackText: string) => {
+    try {
+      const res = await fetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ questionId, questionPreview, feedbackText })
+      })
+      if (!res.ok) throw new Error("Failed to submit feedback")
+    } catch (error) {
+      console.error("Error submitting feedback", error)
+    }
   }
+
 
   const handleExportAnki = async () => {
     const questionsToExport = questions.filter((q) =>

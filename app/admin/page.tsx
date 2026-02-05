@@ -353,12 +353,34 @@ export default function AdminPage() {
   const handleSaveEditAvailable = async () => {
     if (!editingAvailableQuestion) return
 
+    let finalCorrectAnswer = editingAvailableQuestion.correctAnswer
+    let finalAnswer = editingAvailableQuestion.answer
+
+    // Try to parse if it looks like JSON array
+    if (typeof finalCorrectAnswer === "string" && finalCorrectAnswer.trim().startsWith("[")) {
+      try {
+        const parsed = JSON.parse(finalCorrectAnswer)
+        if (Array.isArray(parsed)) {
+          finalCorrectAnswer = parsed
+          // Use a better display string for the 'answer' field if it's an array
+          finalAnswer = parsed.join(", ")
+        }
+      } catch (e) {
+        console.warn("Could not parse correctAnswer as JSON, keeping as string")
+      }
+    }
+
+    const questionToSave = {
+      ...editingAvailableQuestion,
+      correctAnswer: finalCorrectAnswer,
+      answer: finalAnswer
+    }
+
     try {
-      // For editing, we reuse the POST/upsert logic
       const res = await fetch("/api/questions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([editingAvailableQuestion])
+        body: JSON.stringify([questionToSave])
       })
       if (!res.ok) throw new Error("Failed to save")
 

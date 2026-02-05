@@ -1,5 +1,8 @@
 "use client"
 
+export const dynamic = "force-dynamic"
+
+
 import React from "react"
 import { useState, useCallback, useEffect } from "react"
 import * as XLSX from "xlsx"
@@ -16,7 +19,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Upload, FileText, Check, X, Edit2, Loader2, AlertCircle, Lock, Trash2, List, MessageSquare } from "lucide-react"
 import type { Semester, ExamType, SubjectArea, ExamPeriod, InteractionType, Question, QuestionFeedback, FeedbackStatus } from "@/lib/types"
 import { EXAM_PERIODS } from "@/lib/types"
-import { mockQuestions } from "@/lib/mock-data"
+// import { mockQuestions } from "@/lib/mock-data"
 import {
   getCustomQuestions,
   setCustomQuestions,
@@ -93,12 +96,20 @@ export default function AdminPage() {
   const [editingAvailableQuestion, setEditingAvailableQuestion] = useState<Question | null>(null)
   const [feedbackList, setFeedbackList] = useState<QuestionFeedback[]>([])
 
-  const loadAvailableQuestions = useCallback(() => {
+  const loadAvailableQuestions = useCallback(async () => {
     if (typeof window === "undefined") return
-    const deleted = getDeletedQuestionIds()
-    const custom = getCustomQuestions()
-    const mockFiltered = mockQuestions.filter((q) => !deleted.includes(q.id))
-    setAvailableQuestions([...mockFiltered, ...custom])
+    try {
+      const res = await fetch("/api/questions", { cache: "no-store" })
+      if (!res.ok) throw new Error("Failed to fetch")
+      const baseQuestions = await res.json()
+
+      const deleted = getDeletedQuestionIds()
+      const custom = getCustomQuestions()
+      const mockFiltered = baseQuestions.filter((q: Question) => !deleted.includes(q.id))
+      setAvailableQuestions([...mockFiltered, ...custom])
+    } catch (error) {
+      console.error("Failed to load questions", error)
+    }
   }, [])
 
   const loadFeedback = useCallback(() => {

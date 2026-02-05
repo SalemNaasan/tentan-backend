@@ -1,5 +1,8 @@
 "use client"
 
+export const dynamic = "force-dynamic"
+
+
 import { useState, useMemo, useEffect } from "react"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
@@ -7,7 +10,7 @@ import { QuestionCard } from "@/components/question-card"
 import { FilterSidebar } from "@/components/filter-sidebar"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { mockQuestions } from "@/lib/mock-data"
+// import { mockQuestions } from "@/lib/mock-data"
 import type { Semester, ExamType, ExamPeriod, SubjectArea, Question } from "@/lib/types"
 import { getCustomQuestions, getDeletedQuestionIds } from "@/lib/questions-store"
 import { addFeedback } from "@/lib/feedback-store"
@@ -24,19 +27,29 @@ export default function StudyPage() {
   const [selectedQuestions, setSelectedQuestions] = useState<string[]>([])
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
 
-  const [questions, setQuestions] = useState<Question[]>(mockQuestions)
+  const [questions, setQuestions] = useState<Question[]>([])
+  const [loading, setLoading] = useState(true)
+
 
   // Load questions: mock (minus deleted) + custom from admin
   useEffect(() => {
-    if (typeof window === "undefined") return
-    try {
-      const deleted = getDeletedQuestionIds()
-      const mockFiltered = mockQuestions.filter((q) => !deleted.includes(q.id))
-      const custom = getCustomQuestions()
-      setQuestions([...mockFiltered, ...custom])
-    } catch (error) {
-      console.error("Failed to load questions from localStorage", error)
+    async function loadData() {
+      try {
+        const res = await fetch("/api/questions", { cache: "no-store" })
+        if (!res.ok) throw new Error("Failed to fetch")
+        const baseQuestions = await res.json()
+
+        const deleted = getDeletedQuestionIds()
+        const mockFiltered = baseQuestions.filter((q: Question) => !deleted.includes(q.id))
+        const custom = getCustomQuestions()
+        setQuestions([...mockFiltered, ...custom])
+      } catch (error) {
+        console.error("Failed to load questions", error)
+      } finally {
+        setLoading(false)
+      }
     }
+    loadData()
   }, [])
 
   const filteredQuestions = useMemo(() => {
@@ -270,7 +283,12 @@ export default function StudyPage() {
 
               {/* Questions List */}
               <div className="space-y-4">
-                {filteredQuestions.length > 0 ? (
+                {loading ? (
+                  <div className="flex justify-center py-12">
+                    <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+                  </div>
+                ) : filteredQuestions.length > 0 ? (
+
                   filteredQuestions.map((question) => (
                     <QuestionCard
                       key={question.id}

@@ -2,7 +2,7 @@
 
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
-import type { Semester, ExamType, SubjectArea } from "@/lib/types"
+import type { Semester, ExamType, SubjectArea, InteractionType } from "@/lib/types"
 import { Star } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -29,6 +29,11 @@ const subjectLabels: Record<SubjectArea, string> = {
   Other: "Övrigt",
 }
 
+const interactionTypes: { value: InteractionType; label: string }[] = [
+  { value: "check_answers", label: "Flervalsfrågor" },
+  { value: "show_answer", label: "Skrivfrågor" },
+]
+
 interface FilterSidebarProps {
   selectedSemesters: Semester[]
   setSelectedSemesters: (semesters: Semester[]) => void
@@ -40,6 +45,8 @@ interface FilterSidebarProps {
   setSelectedPeriods: (periods: string[]) => void
   showOnlyBookmarked: boolean
   onShowOnlyBookmarkedChange: (checked: boolean) => void
+  selectedInteractions: InteractionType[]
+  setSelectedInteractions: (types: InteractionType[]) => void
 }
 
 export function FilterSidebar({
@@ -53,6 +60,8 @@ export function FilterSidebar({
   setSelectedPeriods,
   showOnlyBookmarked,
   onShowOnlyBookmarkedChange,
+  selectedInteractions,
+  setSelectedInteractions,
 }: FilterSidebarProps) {
   const handleSemesterChange = (semester: Semester, checked: boolean) => {
     if (checked) {
@@ -83,6 +92,14 @@ export function FilterSidebar({
       setSelectedPeriods([...selectedPeriods, period])
     } else {
       setSelectedPeriods(selectedPeriods.filter((p) => p !== period))
+    }
+  }
+
+  const handleInteractionChange = (type: InteractionType, checked: boolean) => {
+    if (checked) {
+      setSelectedInteractions([...selectedInteractions, type])
+    } else {
+      setSelectedInteractions(selectedInteractions.filter((t) => t !== type))
     }
   }
 
@@ -195,6 +212,31 @@ export function FilterSidebar({
                 className="text-sm font-normal cursor-pointer"
               >
                 {subjectLabels[subject]}
+              </Label>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="border-t border-border pt-6">
+        <h3 className="mb-3 text-sm font-semibold text-foreground uppercase tracking-wide">
+          Frågetyp
+        </h3>
+        <div className="space-y-2">
+          {interactionTypes.map((type) => (
+            <div key={type.value} className="flex items-center space-x-2">
+              <Checkbox
+                id={`interaction-${type.value}`}
+                checked={selectedInteractions.includes(type.value)}
+                onCheckedChange={(checked) =>
+                  handleInteractionChange(type.value, checked as boolean)
+                }
+              />
+              <Label
+                htmlFor={`interaction-${type.value}`}
+                className="text-sm font-normal cursor-pointer"
+              >
+                {type.label}
               </Label>
             </div>
           ))}

@@ -11,12 +11,12 @@ import { FilterSidebar } from "@/components/filter-sidebar"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 // import { mockQuestions } from "@/lib/mock-data"
-import type { Semester, ExamType, ExamPeriod, SubjectArea, Question } from "@/lib/types"
+import type { Semester, ExamType, ExamPeriod, SubjectArea, Question, InteractionType } from "@/lib/types"
 // import { getCustomQuestions, getDeletedQuestionIds } from "@/lib/questions-store"
 
 // import { addFeedback } from "@/lib/feedback-store"
 
-import { Download, X, Filter, ChevronLeft, ChevronRight, CheckSquare, Square, Star } from "lucide-react"
+import { Download, X, Filter, ChevronLeft, ChevronRight, CheckSquare, Square, Star, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react"
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet"
 import { getBookmarkedIds, toggleBookmark as toggleBookmarkInStore } from "@/lib/bookmarks-store"
 
@@ -35,6 +35,8 @@ export default function StudyPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [bookmarkedIds, setBookmarkedIds] = useState<string[]>([])
   const [showOnlyBookmarked, setShowOnlyBookmarked] = useState(false)
+  const [selectedInteractions, setSelectedInteractions] = useState<InteractionType[]>([])
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc")
 
 
   const [questions, setQuestions] = useState<Question[]>([])
@@ -62,7 +64,7 @@ export default function StudyPage() {
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1)
-  }, [selectedSemesters, selectedExamTypes, selectedSubjects, selectedPeriods, showOnlyBookmarked])
+  }, [selectedSemesters, selectedExamTypes, selectedSubjects, selectedPeriods, showOnlyBookmarked, selectedInteractions])
 
   const filteredQuestions = useMemo(() => {
 
@@ -82,9 +84,16 @@ export default function StudyPage() {
       if (selectedPeriods.length > 0 && !selectedPeriods.includes(q.examPeriod)) {
         return false
       }
+      if (selectedInteractions.length > 0 && !selectedInteractions.includes(q.interaction)) {
+        return false
+      }
       return true
+    }).sort((a, b) => {
+      const numA = Number(a.questionNumber) || 0
+      const numB = Number(b.questionNumber) || 0
+      return sortOrder === "asc" ? numA - numB : numB - numA
     })
-  }, [questions, selectedSemesters, selectedExamTypes, selectedSubjects, selectedPeriods, showOnlyBookmarked, bookmarkedIds])
+  }, [questions, selectedSemesters, selectedExamTypes, selectedSubjects, selectedPeriods, showOnlyBookmarked, bookmarkedIds, selectedInteractions, sortOrder])
 
   const totalPages = Math.ceil(filteredQuestions.length / PAGE_SIZE)
 
@@ -183,13 +192,17 @@ export default function StudyPage() {
     setSelectedExamTypes([])
     setSelectedSubjects([])
     setSelectedPeriods([])
+    setSelectedInteractions([])
+    setShowOnlyBookmarked(false)
   }
 
   const hasActiveFilters =
     selectedSemesters.length > 0 ||
     selectedExamTypes.length > 0 ||
     selectedSubjects.length > 0 ||
-    selectedPeriods.length > 0
+    selectedPeriods.length > 0 ||
+    selectedInteractions.length > 0 ||
+    showOnlyBookmarked
 
   const filterSidebarContent = (
     <FilterSidebar
@@ -203,6 +216,8 @@ export default function StudyPage() {
       setSelectedPeriods={setSelectedPeriods}
       showOnlyBookmarked={showOnlyBookmarked}
       onShowOnlyBookmarkedChange={setShowOnlyBookmarked}
+      selectedInteractions={selectedInteractions}
+      setSelectedInteractions={setSelectedInteractions}
     />
   )
 
@@ -327,7 +342,19 @@ export default function StudyPage() {
                   </Button>
                 )}
 
-                <div className={selectedQuestions.length > 0 ? "" : "ml-auto"}>
+                <div className="flex items-center gap-2 ml-auto">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSortOrder(prev => prev === "asc" ? "desc" : "asc")}
+                    className="gap-2 text-xs h-9"
+                  >
+                    {sortOrder === "asc" ? (
+                      <><ArrowUp className="h-4 w-4" /> Nummer (Stigande)</>
+                    ) : (
+                      <><ArrowDown className="h-4 w-4" /> Nummer (Fallande)</>
+                    )}
+                  </Button>
                   <Button
                     variant="outline"
                     size="sm"

@@ -40,8 +40,11 @@ export async function GET() {
     }))
 
     // 4. Combine and filter
+    const customIds = new Set(customMapped.map(q => q.id))
+    const filteredMock = mockQuestions.filter(q => !deletedSet.has(q.id) && !customIds.has(q.id))
+
     const allQuestions = [
-      ...mockQuestions.filter(q => !deletedSet.has(q.id)),
+      ...filteredMock,
       ...customMapped
     ]
 
@@ -50,9 +53,9 @@ export async function GET() {
         "Cache-Control": "no-store, max-age=0",
       },
     })
-  } catch (error) {
+  } catch (error: any) {
     console.error("API Error (GET):", error)
-    return NextResponse.json({ error: "Failed to fetch questions" }, { status: 500 })
+    return NextResponse.json({ error: error.message || "Failed to fetch questions" }, { status: 500 })
   }
 }
 
@@ -83,9 +86,9 @@ export async function POST(req: NextRequest) {
     if (error) throw error
 
     return NextResponse.json({ success: true })
-  } catch (error) {
+  } catch (error: any) {
     console.error("API Error (POST):", error)
-    return NextResponse.json({ error: "Failed to save questions" }, { status: 500 })
+    return NextResponse.json({ error: error.message || "Failed to save questions" }, { status: 500 })
   }
 }
 

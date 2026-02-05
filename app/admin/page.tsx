@@ -319,14 +319,15 @@ export default function AdminPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(newQuestions)
       })
-      if (!res.ok) throw new Error("Failed to save")
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "Failed to save")
 
       await loadAvailableQuestions()
       alert(`${newQuestions.length} frågor sparades och kommer visas för alla användare.`)
       setExtractedQuestions([])
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to save questions", error)
-      alert("Kunde inte spara frågorna till databasen.")
+      alert(`Kunde inte spara frågorna till databasen: ${error.message}`)
     }
   }
 
@@ -356,18 +357,33 @@ export default function AdminPage() {
     let finalCorrectAnswer = editingAvailableQuestion.correctAnswer
     let finalAnswer = editingAvailableQuestion.answer
 
-    // Try to parse if it looks like JSON array
-    if (typeof finalCorrectAnswer === "string" && finalCorrectAnswer.trim().startsWith("[")) {
-      try {
-        const parsed = JSON.parse(finalCorrectAnswer)
-        if (Array.isArray(parsed)) {
-          finalCorrectAnswer = parsed
-          // Use a better display string for the 'answer' field if it's an array
-          finalAnswer = parsed.join(", ")
+    // Robust parsing for multiple choice
+    if (editingAvailableQuestion.interaction === "check_answers") {
+      if (typeof finalCorrectAnswer === "string") {
+        const trimmed = finalCorrectAnswer.trim()
+        if (trimmed.startsWith("[")) {
+          try {
+            finalCorrectAnswer = JSON.parse(trimmed)
+          } catch {
+            // Fallback for malformed JSON
+            finalCorrectAnswer = trimmed.split(/[|,]/).map(s => s.trim().toLowerCase()).filter(Boolean)
+          }
+        } else {
+          // Comma or pipe separated fallback
+          finalCorrectAnswer = trimmed.split(/[|,]/).map(s => s.trim().toLowerCase()).filter(Boolean)
         }
-      } catch (e) {
-        console.warn("Could not parse correctAnswer as JSON, keeping as string")
       }
+      // Ensure it's an array for display field too if it's check_answers
+      if (Array.isArray(finalCorrectAnswer)) {
+        finalAnswer = finalCorrectAnswer.join(", ")
+      } else {
+        finalCorrectAnswer = [String(finalCorrectAnswer).toLowerCase().trim()]
+        finalAnswer = String(finalCorrectAnswer[0])
+      }
+    } else {
+      // For show_answer, just ensure it's a string
+      finalCorrectAnswer = Array.isArray(finalCorrectAnswer) ? finalCorrectAnswer.join(", ") : String(finalCorrectAnswer)
+      finalAnswer = finalCorrectAnswer
     }
 
     const questionToSave = {
@@ -382,13 +398,15 @@ export default function AdminPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify([questionToSave])
       })
-      if (!res.ok) throw new Error("Failed to save")
+
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "Failed to save")
 
       await loadAvailableQuestions()
       setEditingAvailableQuestion(null)
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to save edit", error)
-      alert("Kunde inte spara ändringarna.")
+      alert(`Kunde inte spara ändringarna: ${error.message}`)
     }
   }
 

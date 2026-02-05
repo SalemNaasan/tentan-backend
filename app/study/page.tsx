@@ -62,7 +62,7 @@ export default function StudyPage() {
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1)
-  }, [selectedSemesters, selectedExamTypes, selectedSubjects, selectedPeriods])
+  }, [selectedSemesters, selectedExamTypes, selectedSubjects, selectedPeriods, showOnlyBookmarked])
 
   const filteredQuestions = useMemo(() => {
 
@@ -84,7 +84,7 @@ export default function StudyPage() {
       }
       return true
     })
-  }, [questions, selectedSemesters, selectedExamTypes, selectedSubjects, selectedPeriods])
+  }, [questions, selectedSemesters, selectedExamTypes, selectedSubjects, selectedPeriods, showOnlyBookmarked, bookmarkedIds])
 
   const totalPages = Math.ceil(filteredQuestions.length / PAGE_SIZE)
 
@@ -92,6 +92,11 @@ export default function StudyPage() {
     const start = (currentPage - 1) * PAGE_SIZE
     return filteredQuestions.slice(start, start + PAGE_SIZE)
   }, [filteredQuestions, currentPage])
+
+  const handleToggleBookmark = (id: string) => {
+    const next = toggleBookmarkInStore(id)
+    setBookmarkedIds(next)
+  }
 
   const handleQuestionSelect = (questionId: string, selected: boolean) => {
     if (selected) {

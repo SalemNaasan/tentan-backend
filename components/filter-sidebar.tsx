@@ -3,6 +3,8 @@
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import type { Semester, ExamType, SubjectArea } from "@/lib/types"
+import { Star } from "lucide-react"
+import { cn } from "@/lib/utils"
 
 const semesters: Semester[] = ["T1", "T2", "T3", "T4", "T5"]
 const examTypes: { value: ExamType; label: string }[] = [
@@ -36,6 +38,8 @@ interface FilterSidebarProps {
   setSelectedSubjects: (subjects: SubjectArea[]) => void
   selectedPeriods: string[]
   setSelectedPeriods: (periods: string[]) => void
+  showOnlyBookmarked: boolean
+  onShowOnlyBookmarkedChange: (checked: boolean) => void
 }
 
 export function FilterSidebar({
@@ -47,6 +51,8 @@ export function FilterSidebar({
   setSelectedSubjects,
   selectedPeriods,
   setSelectedPeriods,
+  showOnlyBookmarked,
+  onShowOnlyBookmarkedChange,
 }: FilterSidebarProps) {
   const handleSemesterChange = (semester: Semester, checked: boolean) => {
     if (checked) {

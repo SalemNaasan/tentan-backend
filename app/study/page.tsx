@@ -12,7 +12,8 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 // import { mockQuestions } from "@/lib/mock-data"
 import type { Semester, ExamType, ExamPeriod, SubjectArea, Question } from "@/lib/types"
-import { getCustomQuestions, getDeletedQuestionIds } from "@/lib/questions-store"
+// import { getCustomQuestions, getDeletedQuestionIds } from "@/lib/questions-store"
+
 import { addFeedback } from "@/lib/feedback-store"
 import { Download, X, Filter } from "lucide-react"
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet"
@@ -31,18 +32,14 @@ export default function StudyPage() {
   const [loading, setLoading] = useState(true)
 
 
-  // Load questions: mock (minus deleted) + custom from admin
+  // Load questions: mock + custom - deleted from global DB
   useEffect(() => {
     async function loadData() {
       try {
         const res = await fetch("/api/questions", { cache: "no-store" })
         if (!res.ok) throw new Error("Failed to fetch")
-        const baseQuestions = await res.json()
-
-        const deleted = getDeletedQuestionIds()
-        const mockFiltered = baseQuestions.filter((q: Question) => !deleted.includes(q.id))
-        const custom = getCustomQuestions()
-        setQuestions([...mockFiltered, ...custom])
+        const allQuestions = await res.json()
+        setQuestions(allQuestions)
       } catch (error) {
         console.error("Failed to load questions", error)
       } finally {

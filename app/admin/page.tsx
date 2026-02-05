@@ -20,12 +20,13 @@ import { Upload, FileText, Check, X, Edit2, Loader2, AlertCircle, Lock, Trash2, 
 import type { Semester, ExamType, SubjectArea, ExamPeriod, InteractionType, Question, QuestionFeedback, FeedbackStatus } from "@/lib/types"
 import { EXAM_PERIODS } from "@/lib/types"
 // import { mockQuestions } from "@/lib/mock-data"
-import {
-  getCustomQuestions,
-  setCustomQuestions,
-  getDeletedQuestionIds,
-  setDeletedQuestionIds,
-} from "@/lib/questions-store"
+// import {
+//   getCustomQuestions,
+//   setCustomQuestions,
+//   getDeletedQuestionIds,
+//   setDeletedQuestionIds,
+// } from "@/lib/questions-store"
+
 import { getFeedback, updateFeedbackStatus } from "@/lib/feedback-store"
 
 const ADMIN_PASSWORD = "salem"
@@ -97,16 +98,11 @@ export default function AdminPage() {
   const [feedbackList, setFeedbackList] = useState<QuestionFeedback[]>([])
 
   const loadAvailableQuestions = useCallback(async () => {
-    if (typeof window === "undefined") return
     try {
       const res = await fetch("/api/questions", { cache: "no-store" })
       if (!res.ok) throw new Error("Failed to fetch")
-      const baseQuestions = await res.json()
-
-      const deleted = getDeletedQuestionIds()
-      const custom = getCustomQuestions()
-      const mockFiltered = baseQuestions.filter((q: Question) => !deleted.includes(q.id))
-      setAvailableQuestions([...mockFiltered, ...custom])
+      const data = await res.json()
+      setAvailableQuestions(data)
     } catch (error) {
       console.error("Failed to load questions", error)
     }
@@ -286,7 +282,7 @@ export default function AdminPage() {
     setEditingQuestion(null)
   }
 
-  const handleSaveAll = () => {
+  const handleSaveAll = async () => {
     const approved = extractedQuestions.filter((q) => q.status === "approved")
 
     if (approved.length === 0) {
@@ -309,69 +305,63 @@ export default function AdminPage() {
       answer: Array.isArray(q.correctAnswer) ? q.correctAnswer.join(", ") : (q.correctAnswer as string),
     }))
 
-    if (typeof window !== "undefined") {
-      try {
-        const existing = getCustomQuestions()
-        const merged = [...existing, ...newQuestions]
-        setCustomQuestions(merged)
-        loadAvailableQuestions()
-        alert(`${newQuestions.length} frågor sparades och kommer visas under Övningsfrågor på denna enhet.`)
-      } catch (error) {
-        console.error("Failed to save questions to localStorage", error)
-        alert("Kunde inte spara frågorna lokalt i webbläsaren.")
-      }
+    try {
+      const res = await fetch("/api/questions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newQuestions)
+      })
+      if (!res.ok) throw new Error("Failed to save")
+
+      await loadAvailableQuestions()
+      alert(`${newQuestions.length} frågor sparades och kommer visas för alla användare.`)
+      setExtractedQuestions([])
+    } catch (error) {
+      console.error("Failed to save questions", error)
+      alert("Kunde inte spara frågorna till databasen.")
     }
   }
 
-  const handleDeleteAvailable = (questionId: string) => {
-    if (typeof window === "undefined") return
-    if (questionId.startsWith("custom-")) {
-      const custom = getCustomQuestions().filter((q) => q.id !== questionId)
-      setCustomQuestions(custom)
-    } else {
-      const deleted = getDeletedQuestionIds()
-      if (!deleted.includes(questionId)) {
-        setDeletedQuestionIds([...deleted, questionId])
-      }
+  const handleDeleteAvailable = async (questionId: string) => {
+    if (!confirm("Är du säker på att du vill ta bort denna fråga? Den tas bort för alla användare.")) return
+
+    try {
+      const res = await fetch(`/api/questions?id=${questionId}`, {
+        method: "DELETE"
+      })
+      if (!res.ok) throw new Error("Failed to delete")
+      await loadAvailableQuestions()
+    } catch (error) {
+      console.error("Failed to delete question", error)
+      alert("Kunde inte ta bort frågan.")
     }
-    loadAvailableQuestions()
   }
+
 
   const handleEditAvailable = (question: Question) => {
     setEditingAvailableQuestion({ ...question })
   }
 
-  const handleSaveEditAvailable = () => {
-    if (!editingAvailableQuestion || typeof window === "undefined") return
+  const handleSaveEditAvailable = async () => {
+    if (!editingAvailableQuestion) return
 
-    let finalAnswer = editingAvailableQuestion.correctAnswer
-    if (typeof finalAnswer === "string" && finalAnswer.trim().startsWith("[")) {
-      try {
-        finalAnswer = JSON.parse(finalAnswer)
-      } catch (e) {
-        console.warn("Could not parse correctAnswer as JSON, keeping as string")
-      }
+    try {
+      // For editing, we reuse the POST/upsert logic
+      const res = await fetch("/api/questions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify([editingAvailableQuestion])
+      })
+      if (!res.ok) throw new Error("Failed to save")
+
+      await loadAvailableQuestions()
+      setEditingAvailableQuestion(null)
+    } catch (error) {
+      console.error("Failed to save edit", error)
+      alert("Kunde inte spara ändringarna.")
     }
-
-    const custom = getCustomQuestions()
-    const updatedQuestion = { ...editingAvailableQuestion, correctAnswer: finalAnswer }
-
-    if (editingAvailableQuestion.id.startsWith("custom-")) {
-      const updated = custom.map((q) =>
-        q.id === editingAvailableQuestion.id ? updatedQuestion : q
-      )
-      setCustomQuestions(updated)
-    } else {
-      setDeletedQuestionIds([...getDeletedQuestionIds(), editingAvailableQuestion.id])
-      const newQuestion: Question = {
-        ...updatedQuestion,
-        id: `custom-${Date.now()}-0`,
-      }
-      setCustomQuestions([...custom, newQuestion])
-    }
-    loadAvailableQuestions()
-    setEditingAvailableQuestion(null)
   }
+
 
   const resetUpload = () => {
     setUploadState({ status: "idle", progress: 0 })

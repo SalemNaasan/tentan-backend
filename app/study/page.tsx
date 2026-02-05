@@ -16,8 +16,11 @@ import type { Semester, ExamType, ExamPeriod, SubjectArea, Question } from "@/li
 
 // import { addFeedback } from "@/lib/feedback-store"
 
-import { Download, X, Filter } from "lucide-react"
+import { Download, X, Filter, ChevronLeft, ChevronRight, CheckSquare, Square } from "lucide-react"
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet"
+
+const PAGE_SIZE = 10
+
 
 
 
@@ -28,6 +31,8 @@ export default function StudyPage() {
   const [selectedPeriods, setSelectedPeriods] = useState<string[]>([])
   const [selectedQuestions, setSelectedQuestions] = useState<string[]>([])
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+
 
   const [questions, setQuestions] = useState<Question[]>([])
   const [loading, setLoading] = useState(true)
@@ -50,7 +55,13 @@ export default function StudyPage() {
     loadData()
   }, [])
 
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [selectedSemesters, selectedExamTypes, selectedSubjects, selectedPeriods])
+
   const filteredQuestions = useMemo(() => {
+
     return questions.filter((q) => {
       if (selectedSemesters.length > 0 && !selectedSemesters.includes(q.semester)) {
         return false
@@ -68,7 +79,15 @@ export default function StudyPage() {
     })
   }, [questions, selectedSemesters, selectedExamTypes, selectedSubjects, selectedPeriods])
 
+  const totalPages = Math.ceil(filteredQuestions.length / PAGE_SIZE)
+
+  const paginatedQuestions = useMemo(() => {
+    const start = (currentPage - 1) * PAGE_SIZE
+    return filteredQuestions.slice(start, start + PAGE_SIZE)
+  }, [filteredQuestions, currentPage])
+
   const handleQuestionSelect = (questionId: string, selected: boolean) => {
+
     if (selected) {
       setSelectedQuestions((prev) => [...prev, questionId])
     } else {
@@ -269,65 +288,111 @@ export default function StudyPage() {
                   </>
                 )}
 
-                {/* Anki Export Button */}
-                {selectedQuestions.length > 0 && (
-                  <Button
-                    onClick={handleExportAnki}
-                    className="ml-auto gap-2"
-                  >
-                    <Download className="h-4 w-4" />
-                    Exportera till Anki ({selectedQuestions.length})
-                  </Button>
+              </Button>
                 )}
-              </div>
 
-              {/* Results Count */}
-              <div className="mb-4">
-                <p className="text-sm text-muted-foreground">
-                  {filteredQuestions.length} fråg{filteredQuestions.length !== 1 ? "or" : "a"} hittades
-                </p>
-              </div>
-
-              {/* Questions List */}
-              <div className="space-y-4">
-                {loading ? (
-                  <div className="flex justify-center py-12">
-                    <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
-                  </div>
-                ) : filteredQuestions.length > 0 ? (
-
-                  filteredQuestions.map((question) => (
-                    <QuestionCard
-                      key={question.id}
-                      question={question}
-                      isSelected={selectedQuestions.includes(question.id)}
-                      onSelectChange={(selected) =>
-                        handleQuestionSelect(question.id, selected)
-                      }
-                      onFeedbackSubmit={handleFeedbackSubmit}
-                    />
-                  ))
-                ) : (
-                  <div className="rounded-lg border border-border bg-card p-12 text-center">
-                    <p className="text-muted-foreground">
-                      Inga frågor matchar dina filter. Prova att justera ditt urval.
-                    </p>
-                    <Button
-                      variant="outline"
-                      className="mt-4 bg-transparent"
-                      onClick={clearAllFilters}
-                    >
-                      Rensa filter
-                    </Button>
-                  </div>
-                )}
+              <div className="ml-auto flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSelectAll}
+                  className="gap-2 text-xs h-9"
+                >
+                  {filteredQuestions.map(q => q.id).every(id => selectedQuestions.includes(id)) ? (
+                    <><CheckSquare className="h-4 w-4" /> Avmarkera alla</>
+                  ) : (
+                    <><Square className="h-4 w-4" /> Markera alla</>
+                  )}
+                </Button>
               </div>
             </div>
-          </div>
-        </div>
-      </main>
 
-      <Footer />
+            {/* Results Count */}
+
+            <div className="mb-4">
+              <p className="text-sm text-muted-foreground">
+                {filteredQuestions.length} fråg{filteredQuestions.length !== 1 ? "or" : "a"} hittades
+              </p>
+            </div>
+
+            {/* Questions List */}
+            <div className="space-y-4">
+              {loading ? (
+                <div className="flex justify-center py-12">
+                  <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+                </div>
+              ) : filteredQuestions.length > 0 ? (
+
+                paginatedQuestions.map((question) => (
+                  <QuestionCard
+                    key={question.id}
+                    question={question}
+                    isSelected={selectedQuestions.includes(question.id)}
+                    onSelectChange={(selected) =>
+                      handleQuestionSelect(question.id, selected)
+                    }
+                    onFeedbackSubmit={handleFeedbackSubmit}
+                  />
+                ))
+              ) : (
+                <div className="rounded-lg border border-border bg-card p-12 text-center">
+                  <p className="text-muted-foreground">
+                    Inga frågor matchar dina filter. Prova att justera ditt urval.
+                  </p>
+                  <Button
+                    variant="outline"
+                    className="mt-4 bg-transparent"
+                    onClick={clearAllFilters}
+                  >
+                    Rensa filter
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="mt-8 flex items-center justify-center gap-2">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                    <Button
+                      key={page}
+                      variant={currentPage === page ? "default" : "outline"}
+                      size="sm"
+                      className="w-9 h-9"
+                      onClick={() => setCurrentPage(page)}
+                    >
+                      {page}
+                    </Button>
+                  ))}
+                </div>
+
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+          </div>
+
+        </div>
     </div>
+      </main >
+
+    <Footer />
+    </div >
   )
 }

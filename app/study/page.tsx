@@ -16,7 +16,7 @@ import type { Semester, ExamType, ExamPeriod, SubjectArea, Question, Interaction
 
 // import { addFeedback } from "@/lib/feedback-store"
 
-import { Download, X, Filter, ChevronLeft, ChevronRight, CheckSquare, Square, Star, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react"
+import { Download, X, Filter, ChevronLeft, ChevronRight, CheckSquare, Square, Star, ArrowUpDown, ArrowUp, ArrowDown, Search } from "lucide-react"
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet"
 import { getBookmarkedIds, toggleBookmark as toggleBookmarkInStore } from "@/lib/bookmarks-store"
 
@@ -37,6 +37,7 @@ export default function StudyPage() {
   const [showOnlyBookmarked, setShowOnlyBookmarked] = useState(false)
   const [selectedInteractions, setSelectedInteractions] = useState<InteractionType[]>([])
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc")
+  const [searchQuery, setSearchQuery] = useState("")
 
 
   const [questions, setQuestions] = useState<Question[]>([])
@@ -64,7 +65,7 @@ export default function StudyPage() {
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1)
-  }, [selectedSemesters, selectedExamTypes, selectedSubjects, selectedPeriods, showOnlyBookmarked, selectedInteractions])
+  }, [selectedSemesters, selectedExamTypes, selectedSubjects, selectedPeriods, showOnlyBookmarked, selectedInteractions, searchQuery])
 
   const filteredQuestions = useMemo(() => {
 
@@ -90,13 +91,22 @@ export default function StudyPage() {
       if (selectedInteractions.length > 0 && !selectedInteractions.includes(q.interaction)) {
         return false
       }
+      if (searchQuery.trim() !== "") {
+        const query = searchQuery.toLowerCase().trim()
+        const matchesText = q.questionText.toLowerCase().includes(query)
+        const matchesNumber = q.questionNumber.toString().includes(query)
+        const matchesSubject = q.subjectArea.toLowerCase().includes(query)
+        if (!matchesText && !matchesNumber && !matchesSubject) {
+          return false
+        }
+      }
       return true
     }).sort((a, b) => {
       const numA = Number(a.questionNumber) || 0
       const numB = Number(b.questionNumber) || 0
       return sortOrder === "asc" ? numA - numB : numB - numA
     })
-  }, [questions, selectedSemesters, selectedExamTypes, selectedSubjects, selectedPeriods, showOnlyBookmarked, bookmarkedIds, selectedInteractions, sortOrder])
+  }, [questions, selectedSemesters, selectedExamTypes, selectedSubjects, selectedPeriods, showOnlyBookmarked, bookmarkedIds, selectedInteractions, sortOrder, searchQuery])
 
   const totalPages = Math.ceil(filteredQuestions.length / PAGE_SIZE)
 
@@ -322,6 +332,66 @@ export default function StudyPage() {
                           </button>
                         </Badge>
                       ))}
+                      {selectedPeriods.map((p) => (
+                        <Badge key={p} variant="secondary" className="gap-1">
+                          Period {p}
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setSelectedPeriods((prev) =>
+                                prev.filter((x) => x !== p)
+                              )
+                            }
+                            className="ml-1 hover:text-foreground"
+                          >
+                            <X className="h-3 w-3" />
+                            <span className="sr-only">Ta bort Period {p} filter</span>
+                          </button>
+                        </Badge>
+                      ))}
+                      {selectedInteractions.map((i) => (
+                        <Badge key={i} variant="secondary" className="gap-1">
+                          {i === "check_answers" ? "Flerval" : "Skrivfrågor"}
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setSelectedInteractions((prev) =>
+                                prev.filter((x) => x !== i)
+                              )
+                            }
+                            className="ml-1 hover:text-foreground"
+                          >
+                            <X className="h-3 w-3" />
+                            <span className="sr-only">Ta bort {i} filter</span>
+                          </button>
+                        </Badge>
+                      ))}
+                      {showOnlyBookmarked && (
+                        <Badge variant="secondary" className="gap-1">
+                          Bokmärkta
+                          <button
+                            type="button"
+                            onClick={() => setShowOnlyBookmarked(false)}
+                            className="ml-1 hover:text-foreground"
+                          >
+                            <X className="h-3 w-3" />
+                            <span className="sr-only">Ta bort bokmärkta filter</span>
+                          </button>
+                        </Badge>
+                      )}
+                      {searchQuery && (
+                        <Badge variant="secondary" className="gap-1">
+                          Sök: "{searchQuery}"
+                          <button
+                            type="button"
+                            onClick={() => setSearchQuery("")}
+                            className="ml-1 hover:text-foreground"
+                          >
+                            <X className="h-3 w-3" />
+                            <span className="sr-only">Ta bort sökfilter</span>
+                          </button>
+                        </Badge>
+                      )}
                     </div>
                     <Button
                       variant="ghost"
@@ -344,130 +414,129 @@ export default function StudyPage() {
                     Exportera ({selectedQuestions.length})
                   </Button>
                 )}
-
-                <div className="flex items-center gap-2 ml-auto">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setSortOrder(prev => prev === "asc" ? "desc" : "asc")}
-                    className="gap-2 text-xs h-9"
-                  >
-                    {sortOrder === "asc" ? (
-                      <><ArrowUp className="h-4 w-4" /> Nummer (Stigande)</>
-                    ) : (
-                      <><ArrowDown className="h-4 w-4" /> Nummer (Fallande)</>
-                    )}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleSelectAll}
-                    className="gap-2 text-xs h-9"
-                  >
-                    {filteredQuestions.length > 0 &&
-                      filteredQuestions.every(q => selectedQuestions.includes(q.id)) ? (
-                      <><CheckSquare className="h-4 w-4" /> Avmarkera alla</>
-                    ) : (
-                      <><Square className="h-4 w-4" /> Markera alla</>
-                    )}
-                  </Button>
-                </div>
               </div>
 
-              {/* Results Count & Selection Counter */}
-              <div className="mb-4 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <p className="text-sm text-muted-foreground">
-                    {filteredQuestions.length} fråg{filteredQuestions.length !== 1 ? "or" : "a"} hittades
-                  </p>
-                  {selectedQuestions.length > 0 && (
-                    <Badge variant="secondary" className="gap-1.5 py-1 px-3 bg-primary/5 text-primary border-primary/10">
-                      <Download className="h-3 w-3" />
-                      {selectedQuestions.length} markerade
-                    </Badge>
+              <div className="flex items-center gap-2 ml-auto">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSortOrder(prev => prev === "asc" ? "desc" : "asc")}
+                  className="gap-2 text-xs h-9"
+                >
+                  {sortOrder === "asc" ? (
+                    <><ArrowUp className="h-4 w-4" /> Nummer (Stigande)</>
+                  ) : (
+                    <><ArrowDown className="h-4 w-4" /> Nummer (Fallande)</>
                   )}
-                  {bookmarkedIds.length > 0 && (
-                    <Badge variant="outline" className="gap-1.5 py-1 px-3">
-                      <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-                      {bookmarkedIds.length} bokmärkta totalt
-                    </Badge>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSelectAll}
+                  className="gap-2 text-xs h-9"
+                >
+                  {filteredQuestions.length > 0 &&
+                    filteredQuestions.every(q => selectedQuestions.includes(q.id)) ? (
+                    <><CheckSquare className="h-4 w-4" /> Avmarkera alla</>
+                  ) : (
+                    <><Square className="h-4 w-4" /> Markera alla</>
                   )}
-                </div>
+                </Button>
               </div>
+            </div>
 
-              {/* Questions List */}
-              <div className="space-y-4">
-                {loading ? (
-                  <div className="flex justify-center py-12">
-                    <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
-                  </div>
-                ) : filteredQuestions.length > 0 ? (
-                  paginatedQuestions.map((question) => (
-                    <QuestionCard
-                      key={question.id}
-                      question={question}
-                      isSelected={selectedQuestions.includes(question.id)}
-                      onSelectChange={(selected) =>
-                        handleQuestionSelect(question.id, selected)
-                      }
-                      onFeedbackSubmit={handleFeedbackSubmit}
-                      isBookmarked={bookmarkedIds.includes(question.id)}
-                      onToggleBookmark={() => handleToggleBookmark(question.id)}
-                    />
-                  ))
-                ) : (
-                  <div className="rounded-lg border border-border bg-card p-12 text-center">
-                    <p className="text-muted-foreground">
-                      Inga frågor matchar dina filter. Prova att justera ditt urval.
-                    </p>
-                    <Button
-                      variant="outline"
-                      className="mt-4 bg-transparent"
-                      onClick={clearAllFilters}
-                    >
-                      Rensa filter
-                    </Button>
-                  </div>
+            {/* Results Count & Selection Counter */}
+            <div className="mb-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <p className="text-sm text-muted-foreground">
+                  {filteredQuestions.length} fråg{filteredQuestions.length !== 1 ? "or" : "a"} hittades
+                </p>
+                {selectedQuestions.length > 0 && (
+                  <Badge variant="secondary" className="gap-1.5 py-1 px-3 bg-primary/5 text-primary border-primary/10">
+                    <Download className="h-3 w-3" />
+                    {selectedQuestions.length} markerade
+                  </Badge>
+                )}
+                {bookmarkedIds.length > 0 && (
+                  <Badge variant="outline" className="gap-1.5 py-1 px-3">
+                    <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+                    {bookmarkedIds.length} bokmärkta totalt
+                  </Badge>
                 )}
               </div>
+            </div>
 
-              {/* Pagination Controls */}
-              {totalPages > 1 && (
-                <div className="mt-8 flex items-center justify-center gap-2">
+            {/* Questions List */}
+            <div className="space-y-4">
+              {loading ? (
+                <div className="flex justify-center py-12">
+                  <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+                </div>
+              ) : filteredQuestions.length > 0 ? (
+                paginatedQuestions.map((question) => (
+                  <QuestionCard
+                    key={question.id}
+                    question={question}
+                    isSelected={selectedQuestions.includes(question.id)}
+                    onSelectChange={(selected) =>
+                      handleQuestionSelect(question.id, selected)
+                    }
+                    onFeedbackSubmit={handleFeedbackSubmit}
+                    isBookmarked={bookmarkedIds.includes(question.id)}
+                    onToggleBookmark={() => handleToggleBookmark(question.id)}
+                  />
+                ))
+              ) : (
+                <div className="rounded-lg border border-border bg-card p-12 text-center">
+                  <p className="text-muted-foreground">
+                    Inga frågor matchar dina filter. Prova att justera ditt urval.
+                  </p>
                   <Button
                     variant="outline"
-                    size="icon"
-                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                    disabled={currentPage === 1}
+                    className="mt-4 bg-transparent"
+                    onClick={clearAllFilters}
                   >
-                    <ChevronLeft className="h-4 w-4" />
-                  </Button>
-
-                  <div className="flex flex-wrap items-center justify-center gap-1">
-                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                      <Button
-                        key={page}
-                        variant={currentPage === page ? "default" : "outline"}
-                        size="sm"
-                        className="w-9 h-9"
-                        onClick={() => setCurrentPage(page)}
-                      >
-                        {page}
-                      </Button>
-                    ))}
-                  </div>
-
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                    disabled={currentPage === totalPages}
-                  >
-                    <ChevronRight className="h-4 w-4" />
+                    Rensa filter
                   </Button>
                 </div>
               )}
             </div>
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="mt-8 flex items-center justify-center gap-2">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+
+                <div className="flex flex-wrap items-center justify-center gap-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                    <Button
+                      key={page}
+                      variant={currentPage === page ? "default" : "outline"}
+                      size="sm"
+                      className="w-9 h-9"
+                      onClick={() => setCurrentPage(page)}
+                    >
+                      {page}
+                    </Button>
+                  ))}
+                </div>
+
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       </main>

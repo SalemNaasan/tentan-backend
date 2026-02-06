@@ -16,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
-import { Upload, FileText, Check, X, Edit2, Loader2, AlertCircle, Lock, Trash2, List, MessageSquare, Eye, EyeOff } from "lucide-react"
+import { Upload, FileText, Check, X, Edit2, Loader2, AlertCircle, Lock, Trash2, List, MessageSquare, Eye, EyeOff, Search, ArrowUpDown } from "lucide-react"
 import type { Semester, ExamType, SubjectArea, ExamPeriod, InteractionType, Question, QuestionFeedback, FeedbackStatus } from "@/lib/types"
 import { EXAM_PERIODS } from "@/lib/types"
 // import { mockQuestions } from "@/lib/mock-data"
@@ -97,6 +97,13 @@ export default function AdminPage() {
   const [availableQuestions, setAvailableQuestions] = useState<Question[]>([])
   const [editingAvailableQuestion, setEditingAvailableQuestion] = useState<Question | null>(null)
   const [feedbackList, setFeedbackList] = useState<QuestionFeedback[]>([])
+
+  // Manage tab filters
+  const [manageSearchQuery, setManageSearchQuery] = useState("")
+  const [manageSemester, setManageSemester] = useState<Semester | "all">("all")
+  const [manageSubject, setManageSubject] = useState<SubjectArea | "all">("all")
+  const [manageVisibility, setManageVisibility] = useState<"all" | "visible" | "hidden">("all")
+  const [manageSortOrder, setManageSortOrder] = useState<"asc" | "desc">("desc")
 
   const loadAvailableQuestions = useCallback(async () => {
     try {
@@ -424,6 +431,31 @@ export default function AdminPage() {
       alert("Kunde inte ändra synlighet.")
     }
   }
+
+  const filteredManageQuestions = availableQuestions.filter(q => {
+    if (manageSemester !== "all" && q.semester !== manageSemester) return false
+    if (manageSubject !== "all" && q.subjectArea !== manageSubject) return false
+    if (manageVisibility === "visible" && q.isHidden) return false
+    if (manageVisibility === "hidden" && !q.isHidden) return false
+
+    if (manageSearchQuery.trim() !== "") {
+      const query = manageSearchQuery.toLowerCase().trim()
+      const matchesText = q.questionText.toLowerCase().includes(query)
+      const matchesId = q.id.toLowerCase().includes(query)
+      const matchesNumber = q.questionNumber.toString().includes(query)
+      if (!matchesText && !matchesId && !matchesNumber) return false
+    }
+    return true
+  }).sort((a, b) => {
+    const timeA = a.id.startsWith("custom-") ? parseInt(a.id.split("-")[1]) : 0
+    const timeB = b.id.startsWith("custom-") ? parseInt(b.id.split("-")[1]) : 0
+
+    if (manageSortOrder === "desc") {
+      return timeB - timeA || b.questionNumber - a.questionNumber
+    } else {
+      return timeA - timeB || a.questionNumber - b.questionNumber
+    }
+  })
 
 
   const resetUpload = () => {
@@ -882,14 +914,74 @@ export default function AdminPage() {
                     Redigera eller ta bort frågor som visas på Övningsfrågor-sidan.
                   </CardDescription>
                 </CardHeader>
-                <CardContent>
-                  {availableQuestions.length === 0 ? (
+                <CardContent className="space-y-6">
+                  {/* Filters Bar */}
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+                    <div className="lg:col-span-2 relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Sök på text, nummer eller ID..."
+                        value={manageSearchQuery}
+                        onChange={(e) => setManageSearchQuery(e.target.value)}
+                        className="pl-9"
+                      />
+                    </div>
+                    <Select value={manageSemester} onValueChange={(v) => setManageSemester(v as any)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Alla terminer" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Alla terminer</SelectItem>
+                        {["T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8", "T9", "T10"].map(s => (
+                          <SelectItem key={s} value={s}>{s}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Select value={manageSubject} onValueChange={(v) => setManageSubject(v as any)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Alla ämnen" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Alla ämnen</SelectItem>
+                        {subjects.map(s => (
+                          <SelectItem key={s} value={s}>{subjectLabels[s]}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Select value={manageVisibility} onValueChange={(v) => setManageVisibility(v as any)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Synlighet" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Alla (Synliga/Dolda)</SelectItem>
+                        <SelectItem value="visible">Endast synliga</SelectItem>
+                        <SelectItem value="hidden">Endast dolda</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="flex items-center justify-between border-b pb-4">
+                    <p className="text-sm text-muted-foreground">
+                      Visar <span className="font-medium text-foreground">{filteredManageQuestions.length}</span> av {availableQuestions.length} frågor
+                    </p>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setManageSortOrder(prev => prev === "asc" ? "desc" : "asc")}
+                      className="gap-2"
+                    >
+                      <ArrowUpDown className="h-4 w-4" />
+                      Sortera: {manageSortOrder === "desc" ? "Nyaste först" : "Äldsta först"}
+                    </Button>
+                  </div>
+
+                  {filteredManageQuestions.length === 0 ? (
                     <p className="text-sm text-muted-foreground py-8 text-center">
-                      Inga frågor att hantera. Ladda upp frågor eller spara godkända frågor från granskningsfliken.
+                      Inga frågor matchar dina filter.
                     </p>
                   ) : (
                     <div className="space-y-4">
-                      {availableQuestions.map((question) => (
+                      {filteredManageQuestions.map((question) => (
                         <Card key={question.id} className="border-border">
                           <CardContent className="pt-6">
                             <div className="flex items-start justify-between gap-4">

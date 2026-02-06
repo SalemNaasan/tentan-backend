@@ -69,6 +69,9 @@ export default function StudyPage() {
   const filteredQuestions = useMemo(() => {
 
     return questions.filter((q) => {
+      if (q.isHidden) {
+        return false
+      }
       if (showOnlyBookmarked && !bookmarkedIds.includes(q.id)) {
         return false
       }

@@ -39,6 +39,7 @@ export interface Question {
   options?: string[]
   correctAnswer: string | string[]
   answer: string // Keep as the displayable correct answer/explanation
+  isHidden?: boolean
 }
 
 export interface Exam {

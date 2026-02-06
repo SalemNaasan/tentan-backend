@@ -16,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
-import { Upload, FileText, Check, X, Edit2, Loader2, AlertCircle, Lock, Trash2, List, MessageSquare } from "lucide-react"
+import { Upload, FileText, Check, X, Edit2, Loader2, AlertCircle, Lock, Trash2, List, MessageSquare, Eye, EyeOff } from "lucide-react"
 import type { Semester, ExamType, SubjectArea, ExamPeriod, InteractionType, Question, QuestionFeedback, FeedbackStatus } from "@/lib/types"
 import { EXAM_PERIODS } from "@/lib/types"
 // import { mockQuestions } from "@/lib/mock-data"
@@ -407,6 +407,21 @@ export default function AdminPage() {
     } catch (error: any) {
       console.error("Failed to save edit", error)
       alert(`Kunde inte spara ändringarna: ${error.message}`)
+    }
+  }
+
+  const handleToggleVisibility = async (question: Question) => {
+    try {
+      const res = await fetch("/api/questions", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: question.id, isHidden: !question.isHidden })
+      })
+      if (!res.ok) throw new Error("Failed to update visibility")
+      await loadAvailableQuestions()
+    } catch (error) {
+      console.error("Failed to toggle visibility", error)
+      alert("Kunde inte ändra synlighet.")
     }
   }
 
@@ -891,11 +906,29 @@ export default function AdminPage() {
                                       Egna
                                     </Badge>
                                   )}
+                                  {question.isHidden && (
+                                    <Badge variant="destructive" className="text-xs">
+                                      Dold
+                                    </Badge>
+                                  )}
                                 </div>
-                                <p className="font-medium text-foreground line-clamp-2">{question.questionText}</p>
+                                <p className={`font-medium text-foreground line-clamp-2 ${question.isHidden ? "opacity-50" : ""}`}>{question.questionText}</p>
                                 <p className="text-sm text-muted-foreground line-clamp-1">{question.answer}</p>
                               </div>
                               <div className="flex gap-2 shrink-0">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="bg-transparent"
+                                  title={question.isHidden ? "Visa fråga" : "Dölj fråga"}
+                                  onClick={() => handleToggleVisibility(question)}
+                                >
+                                  {question.isHidden ? (
+                                    <Eye className="h-4 w-4" />
+                                  ) : (
+                                    <EyeOff className="h-4 w-4" />
+                                  )}
+                                </Button>
                                 <Button
                                   size="sm"
                                   variant="outline"

@@ -21,7 +21,15 @@ export async function GET() {
 
     if (deletedError) throw deletedError
 
+    // 2b. Fetch hidden question IDs
+    const { data: hiddenIds, error: hiddenError } = await supabase
+      .from('hidden_question_ids')
+      .select('id')
+
+    if (hiddenError) throw hiddenError
+
     const deletedSet = new Set(deletedIds.map(d => d.id))
+    const hiddenSet = new Set(hiddenIds.map(h => h.id))
 
     // 3. Map custom questions to local type (ensuring camelCase if they were snake_case)
     const customMapped: Question[] = (customQuestions || []).map(q => ({
@@ -36,12 +44,18 @@ export async function GET() {
       interaction: q.interaction,
       options: q.options,
       correctAnswer: q.correct_answer,
-      answer: q.answer
+      answer: q.answer,
+      isHidden: q.is_hidden
     }))
 
     // 4. Combine and filter
     const customIds = new Set(customMapped.map(q => q.id))
-    const filteredMock = mockQuestions.filter(q => !deletedSet.has(q.id) && !customIds.has(q.id))
+    const filteredMock = mockQuestions
+      .filter(q => !deletedSet.has(q.id) && !customIds.has(q.id))
+      .map(q => ({
+        ...q,
+        isHidden: hiddenSet.has(q.id)
+      }))
 
     const allQuestions = [
       ...filteredMock,
@@ -76,7 +90,8 @@ export async function POST(req: NextRequest) {
       interaction: q.interaction,
       options: q.options,
       correct_answer: q.correctAnswer,
-      answer: q.answer
+      answer: q.answer,
+      is_hidden: q.isHidden
     }))
 
     const { error } = await supabase
@@ -89,6 +104,45 @@ export async function POST(req: NextRequest) {
   } catch (error: any) {
     console.error("API Error (POST):", error)
     return NextResponse.json({ error: error.message || "Failed to save questions" }, { status: 500 })
+  }
+}
+
+export async function PATCH(req: NextRequest) {
+  try {
+    const { id, isHidden } = await req.json()
+
+    if (!id) {
+      return NextResponse.json({ error: "Missing ID" }, { status: 400 })
+    }
+
+    if (id.startsWith('custom-')) {
+      // Update custom question
+      const { error } = await supabase
+        .from('custom_questions')
+        .update({ is_hidden: isHidden })
+        .eq('id', id)
+
+      if (error) throw error
+    } else {
+      // Update mock question visibility
+      if (isHidden) {
+        const { error } = await supabase
+          .from('hidden_question_ids')
+          .upsert({ id })
+        if (error) throw error
+      } else {
+        const { error } = await supabase
+          .from('hidden_question_ids')
+          .delete()
+          .eq('id', id)
+        if (error) throw error
+      }
+    }
+
+    return NextResponse.json({ success: true })
+  } catch (error: any) {
+    console.error("API Error (PATCH):", error)
+    return NextResponse.json({ error: error.message || "Failed to update visibility" }, { status: 500 })
   }
 }
 

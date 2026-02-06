@@ -10,6 +10,7 @@ import { QuestionCard } from "@/components/question-card"
 import { FilterSidebar } from "@/components/filter-sidebar"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
 // import { mockQuestions } from "@/lib/mock-data"
 import type { Semester, ExamType, ExamPeriod, SubjectArea, Question, InteractionType } from "@/lib/types"
 // import { getCustomQuestions, getDeletedQuestionIds } from "@/lib/questions-store"
@@ -258,6 +259,66 @@ export default function StudyPage() {
 
             {/* Main Content */}
             <div className="flex-1">
+              {/* Header / Stats */}
+              <div className="mb-6 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                    <div>
+                      <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Antal frågor</h2>
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-3xl font-bold text-foreground">
+                          {filteredQuestions.length}
+                        </span>
+                        <span className="text-sm text-muted-foreground">av {questions.length}</span>
+                      </div>
+                    </div>
+                    <div className="h-10 w-px bg-border hidden sm:block" />
+                    <div>
+                      <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Bokmärkta</h2>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xl font-bold text-foreground">{bookmarkedIds.length}</span>
+                        <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="relative flex-1 max-w-md">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Sök i frågor (text, nummer, ämne)..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-9 h-11 bg-secondary/30 border-border/50 focus:bg-background transition-all"
+                    />
+                    {searchQuery && (
+                      <button
+                        onClick={() => setSearchQuery("")}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {selectedQuestions.length > 0 && (
+                  <div className="flex items-center gap-3">
+                    <Badge variant="secondary" className="gap-1.5 py-1 px-3 bg-primary/5 text-primary border-primary/10">
+                      <Download className="h-3 w-3" />
+                      {selectedQuestions.length} markerade
+                    </Badge>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleExportAnki}
+                      className="h-8 text-xs gap-2"
+                    >
+                      Exportera till Anki
+                    </Button>
+                  </div>
+                )}
+              </div>
+
               {/* Mobile Filter Button & Active Filters */}
               <div className="mb-6 flex flex-wrap items-center gap-3">
                 <Sheet open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen}>
@@ -403,25 +464,14 @@ export default function StudyPage() {
                     </Button>
                   </>
                 )}
-
-                {/* Anki Export Button */}
-                {selectedQuestions.length > 0 && (
-                  <Button
-                    onClick={handleExportAnki}
-                    className="ml-auto gap-2"
-                  >
-                    <Download className="h-4 w-4" />
-                    Exportera ({selectedQuestions.length})
-                  </Button>
-                )}
               </div>
 
-              <div className="flex items-center gap-2 ml-auto">
+              <div className="flex items-center gap-2 mb-6">
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => setSortOrder(prev => prev === "asc" ? "desc" : "asc")}
-                  className="gap-2 text-xs h-9"
+                  className="gap-2 text-xs h-9 bg-transparent"
                 >
                   {sortOrder === "asc" ? (
                     <><ArrowUp className="h-4 w-4" /> Nummer (Stigande)</>
@@ -433,7 +483,7 @@ export default function StudyPage() {
                   variant="outline"
                   size="sm"
                   onClick={handleSelectAll}
-                  className="gap-2 text-xs h-9"
+                  className="gap-2 text-xs h-9 bg-transparent"
                 >
                   {filteredQuestions.length > 0 &&
                     filteredQuestions.every(q => selectedQuestions.includes(q.id)) ? (
@@ -443,100 +493,80 @@ export default function StudyPage() {
                   )}
                 </Button>
               </div>
-            </div>
 
-            {/* Results Count & Selection Counter */}
-            <div className="mb-4 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <p className="text-sm text-muted-foreground">
-                  {filteredQuestions.length} fråg{filteredQuestions.length !== 1 ? "or" : "a"} hittades
-                </p>
-                {selectedQuestions.length > 0 && (
-                  <Badge variant="secondary" className="gap-1.5 py-1 px-3 bg-primary/5 text-primary border-primary/10">
-                    <Download className="h-3 w-3" />
-                    {selectedQuestions.length} markerade
-                  </Badge>
-                )}
-                {bookmarkedIds.length > 0 && (
-                  <Badge variant="outline" className="gap-1.5 py-1 px-3">
-                    <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-                    {bookmarkedIds.length} bokmärkta totalt
-                  </Badge>
+              {/* Questions List */}
+              <div className="space-y-4">
+                {loading ? (
+                  <div className="flex justify-center py-12">
+                    <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+                  </div>
+                ) : filteredQuestions.length > 0 ? (
+                  paginatedQuestions.map((question) => (
+                    <QuestionCard
+                      key={question.id}
+                      question={question}
+                      isSelected={selectedQuestions.includes(question.id)}
+                      onSelectChange={(selected) =>
+                        handleQuestionSelect(question.id, selected)
+                      }
+                      onFeedbackSubmit={handleFeedbackSubmit}
+                      isBookmarked={bookmarkedIds.includes(question.id)}
+                      onToggleBookmark={() => handleToggleBookmark(question.id)}
+                    />
+                  ))
+                ) : (
+                  <div className="rounded-lg border border-border bg-card p-12 text-center">
+                    <p className="text-muted-foreground">
+                      Inga frågor matchar dina filter. Prova att justera ditt urval.
+                    </p>
+                    <Button
+                      variant="outline"
+                      className="mt-4 bg-transparent"
+                      onClick={clearAllFilters}
+                    >
+                      Rensa filter
+                    </Button>
+                  </div>
                 )}
               </div>
-            </div>
 
-            {/* Questions List */}
-            <div className="space-y-4">
-              {loading ? (
-                <div className="flex justify-center py-12">
-                  <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
-                </div>
-              ) : filteredQuestions.length > 0 ? (
-                paginatedQuestions.map((question) => (
-                  <QuestionCard
-                    key={question.id}
-                    question={question}
-                    isSelected={selectedQuestions.includes(question.id)}
-                    onSelectChange={(selected) =>
-                      handleQuestionSelect(question.id, selected)
-                    }
-                    onFeedbackSubmit={handleFeedbackSubmit}
-                    isBookmarked={bookmarkedIds.includes(question.id)}
-                    onToggleBookmark={() => handleToggleBookmark(question.id)}
-                  />
-                ))
-              ) : (
-                <div className="rounded-lg border border-border bg-card p-12 text-center">
-                  <p className="text-muted-foreground">
-                    Inga frågor matchar dina filter. Prova att justera ditt urval.
-                  </p>
+              {/* Pagination Controls */}
+              {totalPages > 1 && (
+                <div className="mt-8 flex items-center justify-center gap-2">
                   <Button
                     variant="outline"
-                    className="mt-4 bg-transparent"
-                    onClick={clearAllFilters}
+                    size="icon"
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
                   >
-                    Rensa filter
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+
+                  <div className="flex flex-wrap items-center justify-center gap-1">
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                      <Button
+                        key={page}
+                        variant={currentPage === page ? "default" : "outline"}
+                        size="sm"
+                        className="w-9 h-9"
+                        onClick={() => setCurrentPage(page)}
+                      >
+                        {page}
+                      </Button>
+                    ))}
+                  </div>
+
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                  >
+                    <ChevronRight className="h-4 w-4" />
                   </Button>
                 </div>
               )}
             </div>
-
-            {/* Pagination Controls */}
-            {totalPages > 1 && (
-              <div className="mt-8 flex items-center justify-center gap-2">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-
-                <div className="flex flex-wrap items-center justify-center gap-1">
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                    <Button
-                      key={page}
-                      variant={currentPage === page ? "default" : "outline"}
-                      size="sm"
-                      className="w-9 h-9"
-                      onClick={() => setCurrentPage(page)}
-                    >
-                      {page}
-                    </Button>
-                  ))}
-                </div>
-
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                  disabled={currentPage === totalPages}
-                >
-                </Button>
-              </div>
-            )}
           </div>
         </div>
       </main>

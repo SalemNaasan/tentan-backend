@@ -19,7 +19,7 @@ export type SubjectArea =
   | "nspr"
   | "Other"
 
-export type InteractionType = "show_answer" | "check_answers"
+export type InteractionType = "show_answer" | "check_answers" | "drag_matching" | "drag_ordering"
 
 export interface DragPair {
   source: string

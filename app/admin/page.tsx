@@ -16,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
-import { Upload, FileText, Check, X, Edit2, Loader2, AlertCircle, Lock, Trash2, List, MessageSquare, Eye, EyeOff, Search, ArrowUpDown } from "lucide-react"
+import { Upload, FileText, Check, X, Edit2, Loader2, AlertCircle, Lock, Trash2, List, MessageSquare, Eye, EyeOff, Search, ArrowUpDown, Plus, PlusCircle } from "lucide-react"
 import type { Semester, ExamType, SubjectArea, ExamPeriod, InteractionType, Question, QuestionFeedback, FeedbackStatus } from "@/lib/types"
 import { EXAM_PERIODS } from "@/lib/types"
 // import { mockQuestions } from "@/lib/mock-data"
@@ -105,6 +105,20 @@ export default function AdminPage() {
   const [manageSubject, setManageSubject] = useState<SubjectArea | "all">("all")
   const [manageVisibility, setManageVisibility] = useState<"all" | "visible" | "hidden">("all")
   const [manageSortOrder, setManageSortOrder] = useState<"asc" | "desc">("desc")
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
+  const [newQuestion, setNewQuestion] = useState<Partial<Question>>({
+    semester: "T1",
+    examType: "regular",
+    examPeriod: "VT24",
+    subjectArea: "pu",
+    questionNumber: 1,
+    interaction: "show_answer",
+    questionText: "",
+    answer: "",
+    correctAnswer: "",
+    options: [],
+    points: 1,
+  })
 
   const loadAvailableQuestions = useCallback(async () => {
     try {
@@ -418,6 +432,70 @@ export default function AdminPage() {
     } catch (error: any) {
       console.error("Failed to save edit", error)
       alert(`Kunde inte spara ändringarna: ${error.message}`)
+    }
+  }
+
+  const handleCreateQuestion = async () => {
+    if (!newQuestion.questionText) {
+      alert("Vänligen fyll i frågetexten.")
+      return
+    }
+
+    let finalCorrectAnswer = newQuestion.correctAnswer || ""
+    let finalAnswer = newQuestion.answer || ""
+    let finalOptions = newQuestion.options || []
+
+    // Interaction specific logic
+    if (newQuestion.interaction === "check_answers") {
+      if (typeof finalCorrectAnswer === "string") {
+        const trimmed = finalCorrectAnswer.trim()
+        if (trimmed.startsWith("[")) {
+          try {
+            const parsed = JSON.parse(trimmed)
+            finalCorrectAnswer = Array.isArray(parsed) ? parsed : [parsed]
+          } catch {
+            finalCorrectAnswer = trimmed.split(/[|,]/).map(s => s.trim().toLowerCase()).filter(Boolean)
+          }
+        } else {
+          finalCorrectAnswer = trimmed.split(/[|,]/).map(s => s.trim().toLowerCase()).filter(Boolean)
+        }
+      }
+      finalAnswer = Array.isArray(finalCorrectAnswer) ? finalCorrectAnswer.join(", ") : String(finalCorrectAnswer)
+    } else if (newQuestion.interaction === "drag_matching" || newQuestion.interaction === "drag_ordering") {
+      // Ensure correctAnswer and options are handled correctly as JSON strings for Supabase if needed
+      // Actually the API handles them as they are. If it's matching/ordering, the correctAnswer is usually a JSON string.
+      if (typeof finalCorrectAnswer === "string" && !finalCorrectAnswer.trim().startsWith("{") && !finalCorrectAnswer.trim().startsWith("[")) {
+        // Simple validation or formatting could go here
+      }
+      if (!finalAnswer) finalAnswer = "Dra och släpp för att svara."
+    } else {
+      // show_answer
+      finalCorrectAnswer = Array.isArray(finalCorrectAnswer) ? finalCorrectAnswer.join(", ") : String(finalCorrectAnswer)
+      finalAnswer = finalCorrectAnswer
+    }
+
+    const questionToSave = {
+      ...newQuestion,
+      correctAnswer: finalCorrectAnswer,
+      answer: finalAnswer,
+      options: finalOptions
+    } as Question
+
+    try {
+      const res = await fetch("/api/questions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify([questionToSave])
+      })
+
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "Failed to save")
+
+      await loadAvailableQuestions()
+      setIsCreateDialogOpen(false)
+    } catch (error: any) {
+      console.error("Failed to create question", error)
+      alert(`Kunde inte skapa frågan: ${error.message}`)
     }
   }
 
@@ -781,13 +859,31 @@ export default function AdminPage() {
                           <td className="px-3 py-2 border-b border-border text-xs">1</td>
                         </tr>
                         <tr className="bg-secondary/20">
-                          <td className="px-3 py-2 border-r border-border text-muted-foreground font-mono text-xs">2</td>
-                          <td className="px-3 py-2 border-r border-border text-muted-foreground text-xs italic">Fysiologi</td>
-                          <td className="px-3 py-2 border-r border-border text-muted-foreground text-xs">show_answer</td>
-                          <td className="px-3 py-2 border-r border-border text-muted-foreground text-xs italic">Para ihop...</td>
-                          <td className="px-3 py-2 border-r border-border text-muted-foreground text-xs">-</td>
-                          <td className="px-3 py-2 border-r border-border text-muted-foreground text-xs">Svar här</td>
-                          <td className="px-3 py-2 text-muted-foreground text-xs">2</td>
+                          <td className="px-3 py-2 border-b border-r border-border text-muted-foreground font-mono text-xs">2</td>
+                          <td className="px-3 py-2 border-b border-r border-border text-muted-foreground text-xs italic">Fysiologi</td>
+                          <td className="px-3 py-2 border-b border-r border-border text-muted-foreground text-xs">show_answer</td>
+                          <td className="px-3 py-2 border-b border-r border-border text-muted-foreground text-xs italic">Para ihop...</td>
+                          <td className="px-3 py-2 border-b border-r border-border text-muted-foreground text-xs">-</td>
+                          <td className="px-3 py-2 border-b border-r border-border text-muted-foreground text-xs">Svar här</td>
+                          <td className="px-3 py-2 border-b border-border text-muted-foreground text-xs">2</td>
+                        </tr>
+                        <tr>
+                          <td className="px-3 py-2 border-b border-r border-border font-mono text-xs">3</td>
+                          <td className="px-3 py-2 border-b border-r border-border italic text-xs">Anatomi</td>
+                          <td className="px-3 py-2 border-b border-r border-border text-xs">drag_matching</td>
+                          <td className="px-3 py-2 border-b border-r border-border text-xs italic">Matcha...</td>
+                          <td className="px-3 py-2 border-b border-r border-border text-xs">A|1 | B|2</td>
+                          <td className="px-3 py-2 border-b border-r border-border text-xs italic">Se guide</td>
+                          <td className="px-3 py-2 border-b border-border text-xs">2</td>
+                        </tr>
+                        <tr className="bg-secondary/20">
+                          <td className="px-3 py-2 border-r border-border text-muted-foreground font-mono text-xs">4</td>
+                          <td className="px-3 py-2 border-r border-border text-muted-foreground text-xs italic">Biokemi</td>
+                          <td className="px-3 py-2 border-r border-border text-muted-foreground text-xs">drag_ordering</td>
+                          <td className="px-3 py-2 border-r border-border text-muted-foreground text-xs italic">Sortera...</td>
+                          <td className="px-3 py-2 border-r border-border text-muted-foreground text-xs">Steg A | Steg B</td>
+                          <td className="px-3 py-2 border-r border-border text-muted-foreground text-xs italic">Se guide</td>
+                          <td className="px-3 py-2 text-muted-foreground text-xs">3</td>
                         </tr>
                       </tbody>
                     </table>
@@ -973,9 +1069,36 @@ export default function AdminPage() {
                   </div>
 
                   <div className="flex items-center justify-between border-b pb-4">
-                    <p className="text-sm text-muted-foreground">
-                      Visar <span className="font-medium text-foreground">{filteredManageQuestions.length}</span> av {availableQuestions.length} frågor
-                    </p>
+                    <div className="flex items-center gap-4">
+                      <p className="text-sm text-muted-foreground">
+                        Visar <span className="font-medium text-foreground">{filteredManageQuestions.length}</span> av {availableQuestions.length} frågor
+                      </p>
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          setNewQuestion({
+                            id: `custom-${Date.now()}`,
+                            semester: "T1",
+                            examType: "regular",
+                            examDate: new Date().toISOString().split('T')[0],
+                            examPeriod: "VT24",
+                            subjectArea: "pu",
+                            questionNumber: availableQuestions.length + 1,
+                            interaction: "show_answer",
+                            questionText: "",
+                            answer: "",
+                            correctAnswer: "",
+                            options: [],
+                            points: 1,
+                          })
+                          setIsCreateDialogOpen(true)
+                        }}
+                        className="gap-2 h-8"
+                      >
+                        <Plus className="h-4 w-4" />
+                        Skapa ny fråga
+                      </Button>
+                    </div>
                     <Button
                       variant="ghost"
                       size="sm"
@@ -1445,6 +1568,8 @@ export default function AdminPage() {
                     <SelectContent>
                       <SelectItem value="show_answer">Visa svar</SelectItem>
                       <SelectItem value="check_answers">Rätta svar</SelectItem>
+                      <SelectItem value="drag_matching">Matcha (Dra & släpp)</SelectItem>
+                      <SelectItem value="drag_ordering">Ordning (Dra & släpp)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1485,6 +1610,211 @@ export default function AdminPage() {
                 </Button>
                 <Button onClick={handleSaveEdit}>
                   Spara och godkänn
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Create Modal */}
+      {isCreateDialogOpen && newQuestion && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <PlusCircle className="h-5 w-5 text-primary" />
+                Skapa ny fråga
+              </CardTitle>
+              <CardDescription>
+                Fyll i detaljerna för den nya frågan. Den sparas direkt i databasen.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Termin</Label>
+                  <Select
+                    value={newQuestion.semester}
+                    onValueChange={(v) => setNewQuestion(prev => ({ ...prev, semester: v as Semester }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {["T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8", "T9", "T10"].map(s => (
+                        <SelectItem key={s} value={s}>{s}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Ämne/Tema</Label>
+                  <Select
+                    value={newQuestion.subjectArea}
+                    onValueChange={(v) => setNewQuestion(prev => ({ ...prev, subjectArea: v as SubjectArea }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {subjects.map(s => (
+                        <SelectItem key={s} value={s}>{subjectLabels[s]}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Period</Label>
+                  <Select
+                    value={newQuestion.examPeriod}
+                    onValueChange={(v) => setNewQuestion(prev => ({ ...prev, examPeriod: v as ExamPeriod }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {EXAM_PERIODS.map(p => (
+                        <SelectItem key={p} value={p}>{p}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Frågenummer</Label>
+                  <Input
+                    type="number"
+                    value={newQuestion.questionNumber}
+                    onChange={(e) => setNewQuestion(prev => ({ ...prev, questionNumber: Number(e.target.value) || 0 }))}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Interaktion</Label>
+                <Select
+                  value={newQuestion.interaction}
+                  onValueChange={(v) => setNewQuestion(prev => ({ ...prev, interaction: v as InteractionType }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="show_answer">Visa svar (textfråga)</SelectItem>
+                    <SelectItem value="check_answers">Rätta svar (flerval)</SelectItem>
+                    <SelectItem value="drag_matching">Dra och släpp: Matcha</SelectItem>
+                    <SelectItem value="drag_ordering">Dra och släpp: Ordning</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Frågetext</Label>
+                <Textarea
+                  value={newQuestion.questionText}
+                  onChange={(e) => setNewQuestion(prev => ({ ...prev, questionText: e.target.value }))}
+                  rows={3}
+                />
+              </div>
+
+              {newQuestion.interaction === "check_answers" && (
+                <div className="space-y-2">
+                  <Label>Alternativ (skilj med | eller ny rad)</Label>
+                  <Textarea
+                    placeholder="Alternativ A | Alternativ B | Alternativ C"
+                    value={newQuestion.options?.join(" | ")}
+                    onChange={(e) => setNewQuestion(prev => ({ ...prev, options: e.target.value.split(/[|\n]/).map(s => s.trim()).filter(Boolean) }))}
+                    rows={2}
+                  />
+                </div>
+              )}
+
+              {newQuestion.interaction === "drag_matching" && (
+                <div className="space-y-2">
+                  <Label>Matchningspar (Format: Vänster|Höger, ett per rad)</Label>
+                  <Textarea
+                    placeholder="Begrepp 1 | Förklaring 1&#10;Begrepp 2 | Förklaring 2"
+                    value={newQuestion.options?.join("\n")}
+                    onChange={(e) => {
+                      const opts = e.target.value.split("\n").map(s => s.trim()).filter(Boolean)
+                      setNewQuestion(prev => ({ ...prev, options: opts }))
+                    }}
+                    rows={4}
+                  />
+                </div>
+              )}
+
+              {newQuestion.interaction === "drag_ordering" && (
+                <div className="space-y-2">
+                  <Label>Element i ordning (ett per rad)</Label>
+                  <Textarea
+                    placeholder="Första steget&#10;Andra steget&#10;Tredje steget"
+                    value={newQuestion.options?.join("\n")}
+                    onChange={(e) => {
+                      const opts = e.target.value.split("\n").map(s => s.trim()).filter(Boolean)
+                      setNewQuestion(prev => ({ ...prev, options: opts }))
+                    }}
+                    rows={4}
+                  />
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Label>Korrekt svar</Label>
+                <Input
+                  placeholder={
+                    newQuestion.interaction === "check_answers" ? "a, c (kolumnbokstäver)" :
+                      newQuestion.interaction === "drag_matching" ? '{"src-0":"target-0", "src-1":"target-1"}' :
+                        newQuestion.interaction === "drag_ordering" ? '["Steg 1", "Steg 2", "Steg 3"]' :
+                          "Svaret som visas"
+                  }
+                  value={Array.isArray(newQuestion.correctAnswer) ? JSON.stringify(newQuestion.correctAnswer) : newQuestion.correctAnswer}
+                  onChange={(e) => setNewQuestion(prev => ({ ...prev, correctAnswer: e.target.value }))}
+                />
+                {(newQuestion.interaction === "drag_matching" || newQuestion.interaction === "drag_ordering") && (
+                  <p className="text-[10px] text-muted-foreground italic">
+                    Tips: För matching använd formatet: Begrepp 1 | Förklaring 1 osv. Jag skapar JSON åt dig om du lämnar Svar tomt och trycker spara (kommer snart).
+                  </p>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Poäng</Label>
+                  <Input
+                    type="number"
+                    value={newQuestion.points}
+                    onChange={(e) => setNewQuestion(prev => ({ ...prev, points: Number(e.target.value) || 0 }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Tentadatum</Label>
+                  <Input
+                    type="date"
+                    value={newQuestion.examDate}
+                    onChange={(e) => setNewQuestion(prev => ({ ...prev, examDate: e.target.value }))}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Förklaring / Utförligt svar</Label>
+                <Textarea
+                  value={newQuestion.answer}
+                  onChange={(e) => setNewQuestion(prev => ({ ...prev, answer: e.target.value }))}
+                  rows={2}
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-4">
+                <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+                  Avbryt
+                </Button>
+                <Button onClick={handleCreateQuestion}>
+                  Skapa fråga
                 </Button>
               </div>
             </CardContent>

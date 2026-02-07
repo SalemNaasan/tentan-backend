@@ -60,20 +60,50 @@ export function QuestionCard({
   }
 
   const handleCheckAnswer = () => {
-    if (question.interaction !== "check_answers") return
     if (!userAnswer || (Array.isArray(userAnswer) && userAnswer.length === 0)) return
 
-    const selected = (userAnswer as string[]) || []
-    const actual = Array.isArray(question.correctAnswer)
-      ? question.correctAnswer
-      : [question.correctAnswer]
+    if (question.interaction === "check_answers") {
+      const selected = (userAnswer as string[]) || []
+      const actual = Array.isArray(question.correctAnswer)
+        ? question.correctAnswer
+        : [question.correctAnswer]
 
-    // Simple key-based comparison (e.g., ['a'] vs ['a'])
-    const correct = selected.length === actual.length &&
-      selected.every(v => actual.includes(v.toLowerCase().trim()))
+      const correct = selected.length === actual.length &&
+        selected.every(v => actual.includes(v.toLowerCase().trim()))
 
-    setIsCorrect(correct)
-    setIsChecked(true)
+      setIsCorrect(correct)
+      setIsChecked(true)
+    } else if (question.interaction === "drag_matching") {
+      let parsedCorrect: Record<string, string> = {}
+      try {
+        parsedCorrect = typeof question.correctAnswer === "string"
+          ? JSON.parse(question.correctAnswer)
+          : question.correctAnswer as any
+      } catch (e) { }
+
+      const userRes = userAnswer as Record<string, string>
+      const correct = Object.keys(parsedCorrect).length > 0 &&
+        Object.keys(parsedCorrect).length === Object.keys(userRes).length &&
+        Object.keys(parsedCorrect).every(k => parsedCorrect[k] === userRes[k])
+
+      setIsCorrect(correct)
+      setIsChecked(true)
+    } else if (question.interaction === "drag_ordering") {
+      let parsedCorrect: string[] = []
+      try {
+        parsedCorrect = typeof question.correctAnswer === "string"
+          ? JSON.parse(question.correctAnswer)
+          : question.correctAnswer as any
+      } catch (e) { }
+
+      const userRes = userAnswer as string[]
+      const correct = parsedCorrect.length > 0 &&
+        parsedCorrect.length === userRes.length &&
+        parsedCorrect.every((v, i) => v === userRes[i])
+
+      setIsCorrect(correct)
+      setIsChecked(true)
+    }
   }
 
   const handleReset = () => {
@@ -208,11 +238,11 @@ export function QuestionCard({
             {/* Actions */}
             <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
               <div className="flex flex-wrap items-center gap-2">
-                {question.interaction === "check_answers" ? (
+                {["check_answers", "drag_matching", "drag_ordering"].includes(question.interaction) ? (
                   !isChecked ? (
                     <Button
                       onClick={handleCheckAnswer}
-                      disabled={!userAnswer || (Array.isArray(userAnswer) && userAnswer.length === 0)}
+                      disabled={!userAnswer || (Array.isArray(userAnswer) && userAnswer.length === 0) || (typeof userAnswer === 'object' && Object.keys(userAnswer).length === 0)}
                       className="gap-2 bg-accent hover:bg-accent/90"
                     >
                       Rätta svar

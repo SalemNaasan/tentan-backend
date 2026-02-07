@@ -269,7 +269,6 @@ export default function StudyPage() {
                         <span className="text-3xl font-bold text-foreground">
                           {filteredQuestions.length}
                         </span>
-                        <span className="text-sm text-muted-foreground">av {questions.length}</span>
                       </div>
                     </div>
                     <div className="h-10 w-px bg-border hidden sm:block" />
@@ -301,22 +300,24 @@ export default function StudyPage() {
                   </div>
                 </div>
 
-                {selectedQuestions.length > 0 && (
-                  <div className="flex items-center gap-3">
-                    <Badge variant="secondary" className="gap-1.5 py-1 px-3 bg-primary/5 text-primary border-primary/10">
-                      <Download className="h-3 w-3" />
-                      {selectedQuestions.length} markerade
-                    </Badge>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleExportAnki}
-                      className="h-8 text-xs gap-2"
-                    >
-                      Exportera till Anki
-                    </Button>
-                  </div>
-                )}
+                <div className="flex justify-end">
+                  {selectedQuestions.length > 0 && (
+                    <div className="flex items-center gap-3">
+                      <Badge variant="secondary" className="gap-1.5 py-1 px-3 bg-primary/5 text-primary border-primary/10">
+                        <Download className="h-3 w-3" />
+                        {selectedQuestions.length} markerade
+                      </Badge>
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={handleExportAnki}
+                        className="h-9 px-4 text-sm gap-2 bg-[#0066FF] hover:bg-[#0052CC] text-white border-none shadow-sm transition-all"
+                      >
+                        Exportera till Anki
+                      </Button>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Mobile Filter Button & Active Filters */}

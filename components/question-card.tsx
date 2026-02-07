@@ -119,6 +119,11 @@ export function QuestionCard({
               </div>
               <p className="text-sm text-muted-foreground">
                 Fråga {question.questionNumber}
+                {question.points !== undefined && (
+                  <span className="ml-2 px-1.5 py-0.5 rounded-md bg-accent/10 text-accent font-semibold text-[10px] uppercase tracking-wider border border-accent/20">
+                    {question.points} {question.points === 1 ? 'poäng' : 'poäng'}
+                  </span>
+                )}
               </p>
             </div>
           </div>

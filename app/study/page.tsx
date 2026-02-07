@@ -11,6 +11,13 @@ import { FilterSidebar } from "@/components/filter-sidebar"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 // import { mockQuestions } from "@/lib/mock-data"
 import type { Semester, ExamType, ExamPeriod, SubjectArea, Question, InteractionType } from "@/lib/types"
 // import { getCustomQuestions, getDeletedQuestionIds } from "@/lib/questions-store"
@@ -37,7 +44,7 @@ export default function StudyPage() {
   const [bookmarkedIds, setBookmarkedIds] = useState<string[]>([])
   const [showOnlyBookmarked, setShowOnlyBookmarked] = useState(false)
   const [selectedInteractions, setSelectedInteractions] = useState<InteractionType[]>([])
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc")
+  const [sortBy, setSortBy] = useState<"number-asc" | "number-desc" | "points-asc" | "points-desc">("number-asc")
   const [searchQuery, setSearchQuery] = useState("")
 
 
@@ -103,11 +110,17 @@ export default function StudyPage() {
       }
       return true
     }).sort((a, b) => {
-      const numA = Number(a.questionNumber) || 0
-      const numB = Number(b.questionNumber) || 0
-      return sortOrder === "asc" ? numA - numB : numB - numA
+      if (sortBy === "number-asc" || sortBy === "number-desc") {
+        const numA = Number(a.questionNumber) || 0
+        const numB = Number(b.questionNumber) || 0
+        return sortBy === "number-asc" ? numA - numB : numB - numA
+      } else {
+        const pA = a.points || 0
+        const pB = b.points || 0
+        return sortBy === "points-asc" ? pA - pB : pB - pA
+      }
     })
-  }, [questions, selectedSemesters, selectedExamTypes, selectedSubjects, selectedPeriods, showOnlyBookmarked, bookmarkedIds, selectedInteractions, sortOrder, searchQuery])
+  }, [questions, selectedSemesters, selectedExamTypes, selectedSubjects, selectedPeriods, showOnlyBookmarked, bookmarkedIds, selectedInteractions, sortBy, searchQuery])
 
   const totalPages = Math.ceil(filteredQuestions.length / PAGE_SIZE)
 
@@ -468,18 +481,17 @@ export default function StudyPage() {
               </div>
 
               <div className="flex items-center gap-2 mb-6">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setSortOrder(prev => prev === "asc" ? "desc" : "asc")}
-                  className="gap-2 text-xs h-9 bg-transparent"
-                >
-                  {sortOrder === "asc" ? (
-                    <><ArrowUp className="h-4 w-4" /> Nummer (Stigande)</>
-                  ) : (
-                    <><ArrowDown className="h-4 w-4" /> Nummer (Fallande)</>
-                  )}
-                </Button>
+                <Select value={sortBy} onValueChange={(v) => setSortBy(v as any)}>
+                  <SelectTrigger className="w-[180px] h-9 text-xs bg-transparent">
+                    <SelectValue placeholder="Sortera" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="number-asc">Nummer (Stigande)</SelectItem>
+                    <SelectItem value="number-desc">Nummer (Fallande)</SelectItem>
+                    <SelectItem value="points-asc">Poäng (Stigande)</SelectItem>
+                    <SelectItem value="points-desc">Poäng (Fallande)</SelectItem>
+                  </SelectContent>
+                </Select>
                 <Button
                   variant="outline"
                   size="sm"

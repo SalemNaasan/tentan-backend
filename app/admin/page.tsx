@@ -40,6 +40,7 @@ interface ExtractedQuestion {
   questionText: string
   options?: string[]
   correctAnswer: string | string[]
+  points?: number
   status: "pending" | "approved" | "rejected" | "editing"
 }
 
@@ -199,6 +200,7 @@ export default function AdminPage() {
           qText: row[3] != null ? String(row[3]) : "",
           optionsStr: row[4] != null ? String(row[4]) : "",
           correctAnsStr: row[5] != null ? String(row[5]) : "",
+          points: row[6] != null ? Number(row[6]) : undefined,
         }
 
         if (excelRow.qText.trim() === "") continue
@@ -230,6 +232,7 @@ export default function AdminPage() {
           questionText: excelRow.qText.trim(),
           options,
           correctAnswer,
+          points: excelRow.points,
           status: "pending" as const,
         })
 
@@ -318,6 +321,7 @@ export default function AdminPage() {
       options: q.options,
       correctAnswer: q.correctAnswer,
       answer: Array.isArray(q.correctAnswer) ? q.correctAnswer.join(", ") : (q.correctAnswer as string),
+      points: q.points,
     }))
 
     try {
@@ -763,6 +767,7 @@ export default function AdminPage() {
                           <th className="px-3 py-2 text-left font-medium border-b border-r border-border">question_text</th>
                           <th className="px-3 py-2 text-left font-medium border-b border-r border-border">options</th>
                           <th className="px-3 py-2 text-left font-medium border-b border-r border-border">correct_answer</th>
+                          <th className="px-3 py-2 text-left font-medium border-b border-border">points</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -773,14 +778,16 @@ export default function AdminPage() {
                           <td className="px-3 py-2 border-b border-r border-border text-xs italic">Vilken nerv...</td>
                           <td className="px-3 py-2 border-b border-r border-border text-xs">Val A | Val B | Val C</td>
                           <td className="px-3 py-2 border-b border-r border-border text-xs">a</td>
+                          <td className="px-3 py-2 border-b border-border text-xs">1</td>
                         </tr>
                         <tr className="bg-secondary/20">
-                          <td className="px-3 py-2 border-r border-border text-muted-foreground">2</td>
-                          <td className="px-3 py-2 border-r border-border text-muted-foreground">Fysiologi</td>
-                          <td className="px-3 py-2 border-r border-border text-muted-foreground">drag_and_drop</td>
-                          <td className="px-3 py-2 border-r border-border text-muted-foreground">Para ihop...</td>
-                          <td className="px-3 py-2 border-r border-border text-muted-foreground">-</td>
-                          <td className="px-3 py-2 border-r border-border text-muted-foreground">A:1, B:2</td>
+                          <td className="px-3 py-2 border-r border-border text-muted-foreground font-mono text-xs">2</td>
+                          <td className="px-3 py-2 border-r border-border text-muted-foreground text-xs italic">Fysiologi</td>
+                          <td className="px-3 py-2 border-r border-border text-muted-foreground text-xs">show_answer</td>
+                          <td className="px-3 py-2 border-r border-border text-muted-foreground text-xs italic">Para ihop...</td>
+                          <td className="px-3 py-2 border-r border-border text-muted-foreground text-xs">-</td>
+                          <td className="px-3 py-2 border-r border-border text-muted-foreground text-xs">Svar här</td>
+                          <td className="px-3 py-2 text-muted-foreground text-xs">2</td>
                         </tr>
                       </tbody>
                     </table>
@@ -847,6 +854,11 @@ export default function AdminPage() {
                             )}
                             {question.status === "rejected" && (
                               <Badge variant="destructive" className="text-xs">Avvisad</Badge>
+                            )}
+                            {question.points !== undefined && (
+                              <Badge variant="outline" className="text-xs bg-accent/5 border-accent/20">
+                                {question.points} p
+                              </Badge>
                             )}
                           </div>
 
@@ -993,6 +1005,11 @@ export default function AdminPage() {
                                   <Badge variant="secondary" className="text-xs">
                                     {subjectLabels[question.subjectArea]}
                                   </Badge>
+                                  {question.points !== undefined && (
+                                    <Badge variant="outline" className="text-xs bg-accent/5 border-accent/20">
+                                      {question.points} p
+                                    </Badge>
+                                  )}
                                   {question.id.startsWith("custom-") && (
                                     <Badge variant="outline" className="text-xs text-muted-foreground">
                                       Egna
@@ -1275,7 +1292,7 @@ export default function AdminPage() {
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-4 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="avail-edit-semester">Termin</Label>
                   <Select
@@ -1334,6 +1351,19 @@ export default function AdminPage() {
                       ))}
                     </SelectContent>
                   </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="avail-edit-points">Poäng</Label>
+                  <Input
+                    id="avail-edit-points"
+                    type="number"
+                    value={editingAvailableQuestion.points || ""}
+                    onChange={(e) =>
+                      setEditingAvailableQuestion((prev) =>
+                        prev ? { ...prev, points: Number(e.target.value) || 0 } : null
+                      )
+                    }
+                  />
                 </div>
               </div>
               <div className="flex justify-end gap-2 pt-4">
@@ -1419,17 +1449,32 @@ export default function AdminPage() {
                   </Select>
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-options">Alternativ (separerade med |)</Label>
-                <Input
-                  id="edit-options"
-                  value={editingQuestion.options?.join(" | ") || ""}
-                  onChange={(e) =>
-                    setEditingQuestion((prev) =>
-                      prev ? { ...prev, options: e.target.value.split("|").map(s => s.trim()).filter(Boolean) } : null
-                    )
-                  }
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-options">Alternativ (separerade med |)</Label>
+                  <Input
+                    id="edit-options"
+                    value={editingQuestion.options?.join(" | ") || ""}
+                    onChange={(e) =>
+                      setEditingQuestion((prev) =>
+                        prev ? { ...prev, options: e.target.value.split("|").map(s => s.trim()).filter(Boolean) } : null
+                      )
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-points">Poäng</Label>
+                  <Input
+                    id="edit-points"
+                    type="number"
+                    value={editingQuestion.points || ""}
+                    onChange={(e) =>
+                      setEditingQuestion((prev) =>
+                        prev ? { ...prev, points: Number(e.target.value) || 0 } : null
+                      )
+                    }
+                  />
+                </div>
               </div>
               <div className="flex justify-end gap-2 pt-4">
                 <Button

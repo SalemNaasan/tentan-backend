@@ -40,6 +40,7 @@ export interface Question {
   correctAnswer: string | string[]
   answer: string // Keep as the displayable correct answer/explanation
   isHidden?: boolean
+  points?: number
 }
 
 export interface Exam {

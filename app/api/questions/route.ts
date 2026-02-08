@@ -46,7 +46,8 @@ export async function GET() {
       correctAnswer: q.correct_answer,
       answer: q.answer,
       isHidden: q.is_hidden,
-      points: q.points
+      points: q.points,
+      imageUrl: q.image_url
     }))
 
     // 4. Combine and filter
@@ -93,7 +94,8 @@ export async function POST(req: NextRequest) {
       correct_answer: q.correctAnswer,
       answer: q.answer,
       is_hidden: q.isHidden,
-      points: q.points
+      points: q.points,
+      image_url: q.imageUrl
     }))
 
     const { error } = await supabase

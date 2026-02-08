@@ -41,6 +41,7 @@ export interface Question {
   answer: string // Keep as the displayable correct answer/explanation
   isHidden?: boolean
   points?: number
+  imageUrl?: string
 }
 
 export interface Exam {

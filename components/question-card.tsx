@@ -197,6 +197,19 @@ export function QuestionCard({
               </p>
             </div>
 
+            {/* Question Image */}
+            {question.imageUrl && (
+              <div className="my-4 rounded-xl overflow-hidden border border-border/50 bg-secondary/5 shadow-sm">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={question.imageUrl}
+                  alt={`Bild för fråga ${question.questionNumber}`}
+                  className="w-full h-auto max-h-[400px] object-contain mx-auto"
+                  loading="lazy"
+                />
+              </div>
+            )}
+
             {/* Interactive Renderer */}
             <div className="py-2">
               <QuestionRenderer

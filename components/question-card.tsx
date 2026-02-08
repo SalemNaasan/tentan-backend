@@ -60,7 +60,7 @@ export function QuestionCard({
   }
 
   const handleCheckAnswer = () => {
-    if (!userAnswer || (Array.isArray(userAnswer) && userAnswer.length === 0)) return
+    if (question.interaction !== "drag_ordering" && (!userAnswer || (Array.isArray(userAnswer) && userAnswer.length === 0))) return
 
     if (question.interaction === "check_answers") {
       const selected = (userAnswer as string[]) || []
@@ -204,7 +204,8 @@ export function QuestionCard({
                 userAnswer={userAnswer}
                 onAnswerChange={setUserAnswer}
                 disabled={isChecked}
-                showCorrect={isChecked || showCorrectAnswer}
+                showCorrect={isChecked}
+                revealAnswer={showCorrectAnswer}
               />
 
             </div>
@@ -242,7 +243,13 @@ export function QuestionCard({
                   !isChecked ? (
                     <Button
                       onClick={handleCheckAnswer}
-                      disabled={!userAnswer || (Array.isArray(userAnswer) && userAnswer.length === 0) || (typeof userAnswer === 'object' && Object.keys(userAnswer).length === 0)}
+                      disabled={
+                        question.interaction !== "drag_ordering" && (
+                          !userAnswer ||
+                          (Array.isArray(userAnswer) && userAnswer.length === 0) ||
+                          (typeof userAnswer === 'object' && Object.keys(userAnswer).length === 0)
+                        )
+                      }
                       className="gap-2 bg-accent hover:bg-accent/90"
                     >
                       Rätta svar

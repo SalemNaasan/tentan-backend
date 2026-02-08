@@ -32,6 +32,7 @@ interface DragMatchingRendererProps {
     onChange: (value: Record<string, string>) => void
     disabled?: boolean
     showCorrect?: boolean
+    revealAnswer?: boolean
     correctAnswer: Record<string, string>
 }
 
@@ -41,6 +42,7 @@ export function DragMatchingRenderer({
     onChange,
     disabled,
     showCorrect,
+    revealAnswer,
     correctAnswer,
 }: DragMatchingRendererProps) {
     const [sources, setSources] = useState<Item[]>([])
@@ -151,8 +153,8 @@ export function DragMatchingRenderer({
                                         content={targetContent}
                                         disabled={disabled}
                                         isCorrect={isCorrect}
-                                        showCorrect={showCorrect}
-                                        correctHint={correctContent}
+                                        showCorrect={showCorrect || revealAnswer}
+                                        correctHint={revealAnswer ? correctContent : undefined}
                                     />
                                 </div>
                             )

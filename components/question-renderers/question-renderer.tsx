@@ -12,6 +12,7 @@ interface QuestionRendererProps {
     onAnswerChange: (answer: any) => void
     disabled?: boolean
     showCorrect?: boolean
+    revealAnswer?: boolean
 }
 
 export function QuestionRenderer({
@@ -19,20 +20,22 @@ export function QuestionRenderer({
     userAnswer,
     onAnswerChange,
     disabled,
-    showCorrect
+    showCorrect,
+    revealAnswer
 }: QuestionRendererProps) {
     if (question.interaction === "check_answers") {
         const correctAnswers = Array.isArray(question.correctAnswer)
             ? question.correctAnswer
             : [question.correctAnswer as string]
 
+        // Note: For now CheckAnswers handles both via showCorrect
         return (
             <CheckAnswersRenderer
                 options={question.options || []}
                 value={userAnswer as string[] || []}
                 onChange={onAnswerChange}
                 disabled={disabled}
-                showCorrect={showCorrect}
+                showCorrect={showCorrect || revealAnswer}
                 correctAnswers={correctAnswers}
             />
         )
@@ -53,6 +56,7 @@ export function QuestionRenderer({
                 onChange={onAnswerChange}
                 disabled={disabled}
                 showCorrect={showCorrect}
+                revealAnswer={revealAnswer}
                 correctAnswer={parsedCorrect}
             />
         )
@@ -73,6 +77,7 @@ export function QuestionRenderer({
                 onChange={onAnswerChange}
                 disabled={disabled}
                 showCorrect={showCorrect}
+                revealAnswer={revealAnswer}
                 correctAnswer={parsedCorrect}
             />
         )

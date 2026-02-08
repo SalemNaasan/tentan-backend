@@ -30,6 +30,7 @@ interface DragOrderingRendererProps {
     onChange: (value: string[]) => void
     disabled?: boolean
     showCorrect?: boolean
+    revealAnswer?: boolean
     correctAnswer: string[] // Correct order of item IDs
 }
 
@@ -39,6 +40,7 @@ export function DragOrderingRenderer({
     onChange,
     disabled,
     showCorrect,
+    revealAnswer,
     correctAnswer,
 }: DragOrderingRendererProps) {
     const [activeId, setActiveId] = useState<string | null>(null)
@@ -116,7 +118,7 @@ export function DragOrderingRenderer({
                                     content={item.content}
                                     disabled={disabled}
                                     isCorrect={isCorrect}
-                                    showCorrect={showCorrect}
+                                    showCorrect={showCorrect || revealAnswer}
                                 />
                             )
                         })}
@@ -140,7 +142,7 @@ export function DragOrderingRenderer({
                 </DragOverlay>
             </DndContext>
 
-            {showCorrect && (
+            {revealAnswer && (
                 <div className="mt-6 p-4 bg-secondary/10 border border-border rounded-xl space-y-3">
                     <h5 className="text-xs font-bold text-muted-foreground uppercase tracking-widest text-center">Facit: Rätt ordning</h5>
                     <div className="space-y-1.5 text-sm">

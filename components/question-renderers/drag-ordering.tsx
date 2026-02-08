@@ -56,6 +56,11 @@ export function DragOrderingRenderer({
     }, [options, value])
 
     const sensors = useSensors(
+        useSensor(PointerSensor, {
+            activationConstraint: {
+                distance: 8,
+            },
+        }),
         useSensor(MouseSensor, {
             activationConstraint: {
                 distance: 5,
@@ -63,13 +68,8 @@ export function DragOrderingRenderer({
         }),
         useSensor(TouchSensor, {
             activationConstraint: {
-                delay: 250,
+                delay: 200,
                 tolerance: 5,
-            },
-        }),
-        useSensor(PointerSensor, {
-            activationConstraint: {
-                distance: 5,
             },
         }),
         useSensor(KeyboardSensor, {
@@ -187,6 +187,7 @@ function SortableItem({
         transform: CSS.Transform.toString(transform),
         transition,
         opacity: isDragging ? 0 : 1,
+        touchAction: 'none',
     }
 
     return (

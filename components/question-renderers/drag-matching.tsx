@@ -71,6 +71,11 @@ export function DragMatchingRenderer({
     }, [options])
 
     const sensors = useSensors(
+        useSensor(PointerSensor, {
+            activationConstraint: {
+                distance: 8,
+            },
+        }),
         useSensor(MouseSensor, {
             activationConstraint: {
                 distance: 5,
@@ -78,13 +83,8 @@ export function DragMatchingRenderer({
         }),
         useSensor(TouchSensor, {
             activationConstraint: {
-                delay: 250,
+                delay: 200,
                 tolerance: 5,
-            },
-        }),
-        useSensor(PointerSensor, {
-            activationConstraint: {
-                distance: 5,
             },
         }),
         useSensor(KeyboardSensor, {
@@ -217,7 +217,10 @@ function DraggableItem({ id, content, disabled }: { id: string; content: string;
     const style = transform ? {
         transform: CSS.Translate.toString(transform),
         opacity: isDragging ? 0 : 1,
-    } : undefined
+        touchAction: 'none',
+    } : {
+        touchAction: 'none',
+    }
 
     return (
         <div

@@ -28,14 +28,15 @@ export function QuestionRenderer({
             ? question.correctAnswer
             : [question.correctAnswer as string]
 
-        // Note: For now CheckAnswers handles both via showCorrect
+        // Distinguish between feedback (showCorrect) and solution (revealAnswer)
         return (
             <CheckAnswersRenderer
                 options={question.options || []}
                 value={userAnswer as string[] || []}
                 onChange={onAnswerChange}
                 disabled={disabled}
-                showCorrect={showCorrect || revealAnswer}
+                showCorrect={showCorrect}
+                revealAnswer={revealAnswer}
                 correctAnswers={correctAnswers}
             />
         )

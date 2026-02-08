@@ -99,12 +99,23 @@ export function DragMatchingRenderer({
         if (disabled) return
         const { active, over } = event
 
-        if (over && over.id.startsWith("droppable-")) {
-            const targetId = active.id
-            const sourceId = over.id.replace("droppable-", "")
+        if (over) {
+            if (over.id.startsWith("droppable-")) {
+                const targetId = active.id
+                const sourceId = over.id.replace("droppable-", "")
 
-            const newValue = { ...value, [sourceId]: targetId }
-            onChange(newValue)
+                const newValue = { ...value, [sourceId]: targetId }
+                onChange(newValue)
+            } else if (over.id === "pool") {
+                // Return to pool: find which source had this target and remove it
+                const targetId = active.id
+                const sourceId = Object.keys(value).find(key => value[key] === targetId)
+                if (sourceId) {
+                    const newValue = { ...value }
+                    delete newValue[sourceId]
+                    onChange(newValue)
+                }
+            }
         }
     }
 
@@ -125,7 +136,9 @@ export function DragMatchingRenderer({
                         {sources.map((src) => {
                             const currentTargetId = value[src.id]
                             const targetContent = availableTargets.find(t => t.id === currentTargetId)?.content
-                            const isCorrect = showCorrect && correctAnswer[src.id] === currentTargetId
+                            const correctTargetId = correctAnswer[src.id]
+                            const correctContent = availableTargets.find(t => t.id === correctTargetId)?.content
+                            const isCorrect = showCorrect && correctTargetId === currentTargetId
 
                             return (
                                 <div key={src.id} className="flex flex-col gap-2">
@@ -139,6 +152,7 @@ export function DragMatchingRenderer({
                                         disabled={disabled}
                                         isCorrect={isCorrect}
                                         showCorrect={showCorrect}
+                                        correctHint={correctContent}
                                     />
                                 </div>
                             )
@@ -148,7 +162,7 @@ export function DragMatchingRenderer({
                     {/* Available Targets Column */}
                     <div className="space-y-4">
                         <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Förklaringar</h4>
-                        <div className="flex flex-wrap gap-2 min-h-[100px] p-4 border rounded-lg bg-secondary/5">
+                        <PoolZone id="pool" disabled={disabled}>
                             {availableTargets
                                 .filter(t => !Object.values(value).includes(t.id))
                                 .map((target) => (
@@ -162,7 +176,7 @@ export function DragMatchingRenderer({
                             {availableTargets.filter(t => !Object.values(value).includes(t.id)).length === 0 && (
                                 <p className="text-xs text-muted-foreground italic">Alla förklaringar är placerade.</p>
                             )}
-                        </div>
+                        </PoolZone>
                     </div>
                 </div>
 
@@ -222,21 +236,60 @@ function DraggableItem({ id, content, disabled }: { id: string; content: string;
 
 import { useDroppable } from "@dnd-kit/core"
 
-function DropZone({ id, content, disabled, isCorrect, showCorrect }: { id: string; content?: string; disabled?: boolean; isCorrect?: boolean; showCorrect?: boolean }) {
+function PoolZone({ id, children, disabled }: { id: string; children: React.ReactNode; disabled?: boolean }) {
+    const { isOver, setNodeRef } = useDroppable({ id, disabled })
+    return (
+        <div
+            ref={setNodeRef}
+            className={cn(
+                "flex flex-wrap gap-2 min-h-[100px] p-4 border rounded-lg transition-colors",
+                isOver && !disabled ? "bg-primary/5 border-primary" : "bg-secondary/5 border-border"
+            )}
+        >
+            {children}
+        </div>
+    )
+}
+
+function DropZone({
+    id,
+    content,
+    disabled,
+    isCorrect,
+    showCorrect,
+    correctHint
+}: {
+    id: string;
+    content?: string;
+    disabled?: boolean;
+    isCorrect?: boolean;
+    showCorrect?: boolean;
+    correctHint?: string;
+}) {
     const { isOver, setNodeRef } = useDroppable({ id, disabled })
 
     return (
         <div
             ref={setNodeRef}
             className={cn(
-                "min-h-[44px] p-2 border-2 border-dashed rounded-lg transition-all flex items-center justify-center text-sm italic text-muted-foreground",
+                "min-h-[44px] p-2 border-2 border-dashed rounded-lg transition-all flex flex-col items-center justify-center text-sm italic text-muted-foreground",
                 isOver && !disabled && "border-primary bg-primary/10 scale-[1.02]",
                 !content && "border-border/50",
                 content && "border-solid border-border bg-secondary/10 not-italic text-foreground",
-                showCorrect && content && (isCorrect ? "border-green-500 bg-green-100 text-green-900" : "border-red-500 bg-red-100 text-red-900")
+                showCorrect && (
+                    content
+                        ? (isCorrect ? "border-green-500 bg-green-100 text-green-900" : "border-red-500 bg-red-100 text-red-900")
+                        : "border-red-500 bg-red-50"
+                )
             )}
         >
-            {content || "Släpp förklaring här"}
+            <span>{content || "Släpp förklaring här"}</span>
+            {showCorrect && !isCorrect && correctHint && (
+                <div className="mt-2 pt-2 border-t border-red-200 w-full text-center">
+                    <span className="text-[10px] font-bold uppercase block text-red-600">Rätt svar:</span>
+                    <span className="text-xs not-italic text-red-700">{correctHint}</span>
+                </div>
+            )}
         </div>
     )
 }

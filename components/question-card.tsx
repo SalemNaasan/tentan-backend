@@ -204,7 +204,7 @@ export function QuestionCard({
                 userAnswer={userAnswer}
                 onAnswerChange={setUserAnswer}
                 disabled={isChecked}
-                showCorrect={showCorrectAnswer}
+                showCorrect={isChecked || showCorrectAnswer}
               />
 
             </div>

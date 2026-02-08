@@ -139,6 +139,22 @@ export function DragOrderingRenderer({
                     ) : null}
                 </DragOverlay>
             </DndContext>
+
+            {showCorrect && (
+                <div className="mt-6 p-4 bg-secondary/10 border border-border rounded-xl space-y-3">
+                    <h5 className="text-xs font-bold text-muted-foreground uppercase tracking-widest text-center">Facit: Rätt ordning</h5>
+                    <div className="space-y-1.5 text-sm">
+                        {correctAnswer.map((text, i) => (
+                            <div key={i} className="flex gap-3 items-center">
+                                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">
+                                    {i + 1}
+                                </span>
+                                <span className="font-medium text-foreground">{text}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
         </div>
     )
 }
@@ -176,17 +192,31 @@ function SortableItem({
             ref={setNodeRef}
             style={style}
             className={cn(
-                "flex items-center gap-3 p-3 bg-background border rounded-lg shadow-sm transition-all",
+                "flex items-center gap-3 p-3 bg-background border rounded-lg shadow-sm transition-all relative overflow-hidden",
                 !disabled && "cursor-grab active:cursor-grabbing hover:shadow-md hover:border-primary/50",
                 isDragging ? "opacity-0" : "border-border",
                 disabled && "cursor-default opacity-80",
-                showCorrect && (isCorrect ? "border-green-500 bg-green-100 text-green-900" : "border-red-500 bg-red-100 text-red-900")
+                showCorrect && (isCorrect ? "border-green-500 bg-green-50/50" : "border-red-500 bg-red-50/50")
             )}
             {...attributes}
             {...listeners}
         >
             {!disabled && <GripVertical className="h-4 w-4 text-muted-foreground shrink-0" />}
-            <span className="text-sm font-medium">{content}</span>
+            <span className="text-sm font-medium flex-1">{content}</span>
+            {showCorrect && (
+                <div className={cn(
+                    "absolute right-2 top-1/2 -translate-y-1/2 flex h-5 w-5 items-center justify-center rounded-full",
+                    isCorrect ? "bg-green-500 text-white" : "bg-red-500 text-white"
+                )}>
+                    {isCorrect ? (
+                        <Check className="h-3 w-3" />
+                    ) : (
+                        <X className="h-3 w-3" />
+                    )}
+                </div>
+            )}
         </div>
     )
 }
+
+import { Check, X } from "lucide-react"

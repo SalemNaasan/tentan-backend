@@ -1,5 +1,6 @@
 "use client"
 
+import { useId } from "react"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 
@@ -10,13 +11,14 @@ interface ShowAnswerRendererProps {
 }
 
 export function ShowAnswerRenderer({ value, onChange, disabled }: ShowAnswerRendererProps) {
+    const textareaId = useId()
     return (
         <div className="space-y-2">
-            <Label htmlFor="manual-answer" className="text-sm text-muted-foreground italic">
+            <Label htmlFor={textareaId} className="text-sm text-muted-foreground italic">
                 Skriv ditt svar här för att träna (rättas ej automatiskt)
             </Label>
             <Textarea
-                id="manual-answer"
+                id={textareaId}
                 placeholder="Typa ditt svar..."
                 value={value}
                 onChange={(e) => onChange(e.target.value)}

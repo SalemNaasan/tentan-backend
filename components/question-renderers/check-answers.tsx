@@ -1,5 +1,6 @@
 "use client"
 
+import { useId } from "react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
@@ -23,6 +24,7 @@ export function CheckAnswersRenderer({
     revealAnswer,
     correctAnswers
 }: CheckAnswersRendererProps) {
+    const baseId = useId()
     const handleToggle = (key: string) => {
         if (value.includes(key)) {
             onChange(value.filter((val) => val !== key))
@@ -52,13 +54,13 @@ export function CheckAnswersRenderer({
                         )}
                     >
                         <Checkbox
-                            id={`option-${index}`}
+                            id={`${baseId}-option-${index}`}
                             checked={isSelected}
                             onCheckedChange={() => handleToggle(key)}
                             disabled={disabled}
                         />
                         <Label
-                            htmlFor={`option-${index}`}
+                            htmlFor={`${baseId}-option-${index}`}
                             className={cn(
                                 "flex-1 cursor-pointer font-normal leading-relaxed",
                                 showSuccess && "font-medium text-green-700",

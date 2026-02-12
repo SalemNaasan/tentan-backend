@@ -185,6 +185,7 @@ export default function StudyPage() {
       cards: questionsToExport.map((q) => ({
         front: q.questionText,
         back: q.answer,
+        imageUrl: q.imageUrl,
       })),
     }
 

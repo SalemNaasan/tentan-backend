@@ -5,6 +5,7 @@ import AnkiExport from "@steve2955/anki-apkg-export"
 type AnkiCard = {
   front: string
   back: string
+  imageUrl?: string
 }
 
 type AnkiExportRequestBody = {
@@ -26,7 +27,31 @@ export async function POST(req: NextRequest) {
       if (typeof card.front !== "string" || typeof card.back !== "string") {
         continue
       }
-      apkg.addCard(card.front, card.back)
+
+      let frontContent = card.front
+      const backContent = card.back
+
+      if (card.imageUrl) {
+        try {
+          const imageRes = await fetch(card.imageUrl)
+          if (imageRes.ok) {
+            const buffer = await imageRes.arrayBuffer()
+            // Extract filename from URL or generate one
+            const urlParts = card.imageUrl.split('/')
+            const originalFilename = urlParts[urlParts.length - 1].split('?')[0]
+            const extension = originalFilename.includes('.') ? originalFilename.split('.').pop() : 'jpg'
+            const filename = `img_${Math.random().toString(36).substring(2, 9)}.${extension}`
+
+            // @ts-ignore - Assuming addMedia exists in the library
+            apkg.addMedia(filename, buffer)
+            frontContent += `<br><br><img src="${filename}">`
+          }
+        } catch (error) {
+          console.error(`Failed to fetch image for Anki card: ${card.imageUrl}`, error)
+        }
+      }
+
+      apkg.addCard(frontContent, backContent)
     }
 
     const zip = await apkg.save()

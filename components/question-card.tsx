@@ -192,7 +192,7 @@ export function QuestionCard({
           <div className="space-y-6">
             {/* Question Text */}
             <div className="rounded-lg bg-secondary/30 p-4 border border-border/50">
-              <p className="text-foreground leading-relaxed font-medium">
+              <p className="text-foreground leading-relaxed font-medium whitespace-pre-wrap">
                 {question.questionText}
               </p>
             </div>

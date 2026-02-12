@@ -960,7 +960,7 @@ export default function AdminPage() {
                           </div>
 
                           <div>
-                            <p className="font-medium text-foreground">{question.questionText}</p>
+                            <p className="font-medium text-foreground whitespace-pre-wrap">{question.questionText}</p>
                           </div>
 
                           <div className="rounded-lg bg-secondary/50 p-3">
@@ -1145,8 +1145,8 @@ export default function AdminPage() {
                                     </Badge>
                                   )}
                                 </div>
-                                <p className={`font-medium text-foreground line-clamp-2 ${question.isHidden ? "opacity-50" : ""}`}>{question.questionText}</p>
-                                <p className="text-sm text-muted-foreground line-clamp-1">{question.answer}</p>
+                                <p className={`font-medium text-foreground line-clamp-2 whitespace-pre-wrap ${question.isHidden ? "opacity-50" : ""}`}>{question.questionText}</p>
+                                <p className="text-sm text-muted-foreground line-clamp-1 whitespace-pre-wrap">{question.answer}</p>
                               </div>
                               <div className="flex gap-2 shrink-0">
                                 <Button

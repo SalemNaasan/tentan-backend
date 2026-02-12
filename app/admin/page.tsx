@@ -582,11 +582,11 @@ export default function AdminPage() {
           <Card className="w-full max-w-md mx-4">
             <CardHeader className="text-center">
               <div className="flex justify-center mb-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-secondary">
-                  <Lock className="h-6 w-6 text-muted-foreground" />
+                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary">
+                  <BookOpen className="h-6 w-6 text-primary-foreground" />
                 </div>
               </div>
-              <CardTitle>Adminåtkomst</CardTitle>
+              <CardTitle className="text-2xl">tentan.nu</CardTitle>
               <CardDescription>
                 Ange adminlösenordet för att fortsätta.
               </CardDescription>

@@ -43,7 +43,7 @@ interface FilterSidebarProps {
   setSelectedSubjects: (subjects: SubjectArea[]) => void
   selectedPeriods: string[]
   setSelectedPeriods: (periods: string[]) => void
-  showOnlyBookmarked: boolean
+  isOnlyBookmarked: boolean
   onShowOnlyBookmarkedChange: (checked: boolean) => void
   selectedInteractions: InteractionType[]
   setSelectedInteractions: (types: InteractionType[]) => void
@@ -58,7 +58,7 @@ export function FilterSidebar({
   setSelectedSubjects,
   selectedPeriods,
   setSelectedPeriods,
-  showOnlyBookmarked,
+  isOnlyBookmarked,
   onShowOnlyBookmarkedChange,
   selectedInteractions,
   setSelectedInteractions,
@@ -108,11 +108,11 @@ export function FilterSidebar({
       <div className="pb-4 border-b border-border">
         <label className="flex items-center gap-2 cursor-pointer group">
           <Checkbox
-            checked={showOnlyBookmarked}
+            checked={isOnlyBookmarked}
             onCheckedChange={onShowOnlyBookmarkedChange}
           />
           <div className="flex items-center gap-1.5 text-sm font-medium transition-colors group-hover:text-primary">
-            <Star className={cn("h-4 w-4", showOnlyBookmarked ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground")} />
+            <Star className={cn("h-4 w-4", isOnlyBookmarked ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground")} />
             Visa endast bokmärkta
           </div>
         </label>

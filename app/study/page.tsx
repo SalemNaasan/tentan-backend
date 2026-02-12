@@ -42,7 +42,7 @@ export default function StudyPage() {
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const [bookmarkedIds, setBookmarkedIds] = useState<string[]>([])
-  const [showOnlyBookmarked, setShowOnlyBookmarked] = useState(false)
+  const [isOnlyBookmarked, setIsOnlyBookmarked] = useState(false)
   const [selectedInteractions, setSelectedInteractions] = useState<InteractionType[]>([])
   const [sortBy, setSortBy] = useState<"number-asc" | "number-desc" | "points-asc" | "points-desc">("number-asc")
   const [searchQuery, setSearchQuery] = useState("")
@@ -73,7 +73,7 @@ export default function StudyPage() {
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1)
-  }, [selectedSemesters, selectedExamTypes, selectedSubjects, selectedPeriods, showOnlyBookmarked, selectedInteractions, searchQuery])
+  }, [selectedSemesters, selectedExamTypes, selectedSubjects, selectedPeriods, isOnlyBookmarked, selectedInteractions, searchQuery])
 
   const filteredQuestions = useMemo(() => {
 
@@ -81,7 +81,7 @@ export default function StudyPage() {
       if (q.isHidden) {
         return false
       }
-      if (showOnlyBookmarked && !bookmarkedIds.includes(q.id)) {
+      if (isOnlyBookmarked && !bookmarkedIds.includes(q.id)) {
         return false
       }
       if (selectedSemesters.length > 0 && !selectedSemesters.includes(q.semester)) {
@@ -120,7 +120,7 @@ export default function StudyPage() {
         return sortBy === "points-asc" ? pA - pB : pB - pA
       }
     })
-  }, [questions, selectedSemesters, selectedExamTypes, selectedSubjects, selectedPeriods, showOnlyBookmarked, bookmarkedIds, selectedInteractions, sortBy, searchQuery])
+  }, [questions, selectedSemesters, selectedExamTypes, selectedSubjects, selectedPeriods, isOnlyBookmarked, bookmarkedIds, selectedInteractions, sortBy, searchQuery])
 
   const totalPages = Math.ceil(filteredQuestions.length / PAGE_SIZE)
 
@@ -220,7 +220,7 @@ export default function StudyPage() {
     setSelectedSubjects([])
     setSelectedPeriods([])
     setSelectedInteractions([])
-    setShowOnlyBookmarked(false)
+    setIsOnlyBookmarked(false)
   }
 
   const hasActiveFilters =
@@ -229,7 +229,7 @@ export default function StudyPage() {
     selectedSubjects.length > 0 ||
     selectedPeriods.length > 0 ||
     selectedInteractions.length > 0 ||
-    showOnlyBookmarked
+    isOnlyBookmarked
 
   const filterSidebarContent = (
     <FilterSidebar
@@ -241,8 +241,8 @@ export default function StudyPage() {
       setSelectedSubjects={setSelectedSubjects}
       selectedPeriods={selectedPeriods}
       setSelectedPeriods={setSelectedPeriods}
-      showOnlyBookmarked={showOnlyBookmarked}
-      onShowOnlyBookmarkedChange={setShowOnlyBookmarked}
+      isOnlyBookmarked={isOnlyBookmarked}
+      onShowOnlyBookmarkedChange={setIsOnlyBookmarked}
       selectedInteractions={selectedInteractions}
       setSelectedInteractions={setSelectedInteractions}
     />
@@ -441,12 +441,12 @@ export default function StudyPage() {
                           </button>
                         </Badge>
                       ))}
-                      {showOnlyBookmarked && (
+                      {isOnlyBookmarked && (
                         <Badge variant="secondary" className="gap-1">
                           Bokmärkta
                           <button
                             type="button"
-                            onClick={() => setShowOnlyBookmarked(false)}
+                            onClick={() => setIsOnlyBookmarked(false)}
                             className="ml-1 hover:text-foreground"
                           >
                             <X className="h-3 w-3" />

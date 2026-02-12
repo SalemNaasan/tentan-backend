@@ -9,7 +9,7 @@ const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: 'tentan.nu - Tentaplugg för läkarstudenter',
-  description: 'AI-driven plattform för tentaplugg för läkarstudenter vid Linköpings universitet. Öva på gamla tentafrågor med strukturerat lärande.',
+  description: 'Tentaplugg för läkarstudenter vid Linköpings universitet – öva på gamla tentafrågor med struktur.',
   generator: 'v0.app',
   icons: {
     icon: '/icon.svg',

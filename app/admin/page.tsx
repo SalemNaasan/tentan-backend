@@ -16,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
-import { Upload, FileText, Check, X, Edit2, Loader2, AlertCircle, Lock, Trash2, List, MessageSquare, Eye, EyeOff, Search, ArrowUpDown, Plus, PlusCircle, Image as ImageIcon, BookOpen } from "lucide-react"
+import { Upload, FileText, Check, X, Edit2, Loader2, AlertCircle, Lock, Trash2, List, MessageSquare, Eye, EyeOff, Search, ArrowUpDown, Plus, PlusCircle, Image as ImageIcon, BookOpen, Bell } from "lucide-react"
 import type { Semester, ExamType, SubjectArea, ExamPeriod, InteractionType, Question, QuestionFeedback, FeedbackStatus } from "@/lib/types"
 import { EXAM_PERIODS } from "@/lib/types"
 import { ImageUpload } from "@/components/admin/image-upload"
@@ -99,6 +99,9 @@ export default function AdminPage() {
   const [availableQuestions, setAvailableQuestions] = useState<Question[]>([])
   const [editingAvailableQuestion, setEditingAvailableQuestion] = useState<Question | null>(null)
   const [feedbackList, setFeedbackList] = useState<QuestionFeedback[]>([])
+  const [newsContent, setNewsContent] = useState("")
+  const [newsLoading, setNewsLoading] = useState(false)
+  const [saveLoading, setSaveLoading] = useState(false)
 
   // Manage tab filters
   const [manageSearchQuery, setManageSearchQuery] = useState("")
@@ -143,6 +146,21 @@ export default function AdminPage() {
     }
   }, [])
 
+  const loadNews = useCallback(async () => {
+    setNewsLoading(true)
+    try {
+      const res = await fetch("/api/news", { cache: "no-store" })
+      if (!res.ok) throw new Error("Failed to fetch news")
+      const data = await res.json()
+      if (data && data.content) {
+        setNewsContent(data.content)
+      }
+    } catch (error) {
+      console.error("Failed to load news", error)
+    } finally {
+      setNewsLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
     loadAvailableQuestions()
@@ -151,6 +169,10 @@ export default function AdminPage() {
   useEffect(() => {
     loadFeedback()
   }, [loadFeedback])
+
+  useEffect(() => {
+    loadNews()
+  }, [loadNews])
 
   const handleFileUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -354,6 +376,24 @@ export default function AdminPage() {
     } catch (error: any) {
       console.error("Failed to save questions", error)
       alert(`Kunde inte spara frågorna till databasen: ${error.message}`)
+    }
+  }
+
+  const handleSaveNews = async () => {
+    setSaveLoading(true)
+    try {
+      const res = await fetch("/api/news", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: newsContent })
+      })
+      if (!res.ok) throw new Error("Failed to save news")
+      alert("Nyheter sparade!")
+    } catch (error) {
+      console.error("Failed to save news", error)
+      alert("Kunde inte spara nyheter.")
+    } finally {
+      setSaveLoading(false)
     }
   }
 
@@ -667,6 +707,10 @@ export default function AdminPage() {
                     {feedbackList.filter((f) => f.status === "new").length}
                   </Badge>
                 )}
+              </TabsTrigger>
+              <TabsTrigger value="news" className="gap-2">
+                <Bell className="h-4 w-4" />
+                Nyheter
               </TabsTrigger>
             </TabsList>
 
@@ -1302,6 +1346,53 @@ export default function AdminPage() {
                         </Card>
                       ))}
                     </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* News Tab */}
+            <TabsContent value="news" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Hantera nyheter</CardTitle>
+                  <CardDescription>
+                    Texten du skriver här kommer att visas i nyhetsrutan på startsidan.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {newsLoading ? (
+                    <div className="flex justify-center py-12">
+                      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                    </div>
+                  ) : (
+                    <>
+                      <div className="space-y-2">
+                        <Label htmlFor="news-content">Nyhetsinnehåll</Label>
+                        <Textarea
+                          id="news-content"
+                          placeholder="Skriv vad som händer här..."
+                          value={newsContent}
+                          onChange={(e) => setNewsContent(e.target.value)}
+                          rows={15}
+                          className="font-sans text-base leading-relaxed"
+                        />
+                      </div>
+                      <div className="flex justify-end">
+                        <Button
+                          onClick={handleSaveNews}
+                          disabled={saveLoading}
+                          className="gap-2"
+                        >
+                          {saveLoading ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Check className="h-4 w-4" />
+                          )}
+                          Spara ändringar
+                        </Button>
+                      </div>
+                    </>
                   )}
                 </CardContent>
               </Card>

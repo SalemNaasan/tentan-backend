@@ -63,3 +63,9 @@ export interface QuestionFeedback {
   status: FeedbackStatus
   createdAt: string // ISO
 }
+
+export interface NewsItem {
+  id: string
+  content: string
+  updated_at: string
+}

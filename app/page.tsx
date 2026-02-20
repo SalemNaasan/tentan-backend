@@ -3,14 +3,33 @@ import Link from "next/link"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
-import { ArrowRight, BookOpen, Filter, Brain, Download } from "lucide-react"
+import { ArrowRight, BookOpen, Filter, Brain, Download, Bell } from "lucide-react"
+import { supabase } from "@/lib/supabase"
 
-export default function HomePage() {
+export const revalidate = 60 // Revalidate every minute
+
+export default async function HomePage() {
+  const { data: news } = await supabase
+    .from('app_news')
+    .select('*')
+    .order('updated_at', { ascending: false })
+    .limit(1)
+    .single()
+
   return (
     <div className="flex min-h-screen flex-col">
       <Header />
-      
+
       <main className="flex-1">
+        {news && news.content && (
+          <div className="bg-primary/10 border-b border-primary/20 px-4 py-3">
+            <div className="mx-auto max-w-5xl flex items-start gap-3 text-sm text-foreground">
+              <Bell className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+              <div className="whitespace-pre-wrap leading-relaxed">{news.content}</div>
+            </div>
+          </div>
+        )}
+
         {/* Hero Section */}
         <section className="px-4 py-20 md:py-32">
           <div className="mx-auto max-w-3xl text-center">

@@ -10,6 +10,7 @@ export function Header() {
 
   const navLinks = [
     { href: "/study", label: "Plugga" },
+    { href: "/cases", label: "PPL/Fall" },
     { href: "/about", label: "Om oss" },
   ]
 

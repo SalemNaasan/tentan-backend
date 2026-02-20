@@ -16,8 +16,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
-import { Upload, FileText, Check, X, Edit2, Loader2, AlertCircle, Lock, Trash2, List, MessageSquare, Eye, EyeOff, Search, ArrowUpDown, Plus, PlusCircle, Image as ImageIcon, BookOpen, Bell } from "lucide-react"
-import type { Semester, ExamType, SubjectArea, ExamPeriod, InteractionType, Question, QuestionFeedback, FeedbackStatus } from "@/lib/types"
+import { Upload, FileText, Check, X, Edit2, Loader2, AlertCircle, Lock, Trash2, List, MessageSquare, Eye, EyeOff, Search, ArrowUpDown, Plus, PlusCircle, Image as ImageIcon, BookOpen, Bell, Briefcase } from "lucide-react"
+import type { Semester, ExamType, SubjectArea, ExamPeriod, InteractionType, Question, QuestionFeedback, FeedbackStatus, PPLCase } from "@/lib/types"
 import { EXAM_PERIODS } from "@/lib/types"
 import { ImageUpload } from "@/components/admin/image-upload"
 // import { mockQuestions } from "@/lib/mock-data"
@@ -102,6 +102,10 @@ export default function AdminPage() {
   const [newsContent, setNewsContent] = useState("")
   const [newsLoading, setNewsLoading] = useState(false)
   const [saveLoading, setSaveLoading] = useState(false)
+  const [pplCases, setPplCases] = useState<PPLCase[]>([])
+  const [pplCasesLoading, setPplCasesLoading] = useState(false)
+  const [pplCaseSaveLoading, setPplCaseSaveLoading] = useState(false)
+  const [editingPplCase, setEditingPplCase] = useState<Partial<PPLCase> | null>(null)
 
   // Manage tab filters
   const [manageSearchQuery, setManageSearchQuery] = useState("")
@@ -162,6 +166,20 @@ export default function AdminPage() {
     }
   }, [])
 
+  const loadPPLCases = useCallback(async () => {
+    setPplCasesLoading(true)
+    try {
+      const res = await fetch("/api/cases", { cache: "no-store" })
+      if (!res.ok) throw new Error("Failed to fetch cases")
+      const data = await res.json()
+      setPplCases(data)
+    } catch (error) {
+      console.error("Failed to load cases", error)
+    } finally {
+      setPplCasesLoading(false)
+    }
+  }, [])
+
   useEffect(() => {
     loadAvailableQuestions()
   }, [loadAvailableQuestions])
@@ -173,6 +191,10 @@ export default function AdminPage() {
   useEffect(() => {
     loadNews()
   }, [loadNews])
+
+  useEffect(() => {
+    loadPPLCases()
+  }, [loadPPLCases])
 
   const handleFileUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -380,21 +402,42 @@ export default function AdminPage() {
   }
 
   const handleSaveNews = async () => {
-    setSaveLoading(true)
+    // ... same
+  }
+
+  const handleSavePplCase = async () => {
+    if (!editingPplCase?.title || !editingPplCase?.description) {
+      alert("Fyll i både titel och beskrivning.")
+      return
+    }
+    setPplCaseSaveLoading(true)
     try {
-      const res = await fetch("/api/news", {
+      const res = await fetch("/api/cases", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: newsContent })
+        body: JSON.stringify(editingPplCase)
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || "Failed to save news")
-      alert("Nyheter sparade!")
+      if (!res.ok) throw new Error("Failed to save case")
+      await loadPPLCases()
+      setEditingPplCase(null)
+      alert("PPL-fall sparat!")
     } catch (error: any) {
-      console.error("Failed to save news", error)
-      alert(`Kunde inte spara nyheter: ${error.message}`)
+      console.error("Failed to save PPL case", error)
+      alert(`Kunde inte spara PPL-fall: ${error.message}`)
     } finally {
-      setSaveLoading(false)
+      setPplCaseSaveLoading(false)
+    }
+  }
+
+  const handleDeletePplCase = async (id: string) => {
+    if (!confirm("Är du säker på att du vill ta bort detta PPL-fall?")) return
+    try {
+      const res = await fetch(`/api/cases?id=${id}`, { method: "DELETE" })
+      if (!res.ok) throw new Error("Failed to delete case")
+      await loadPPLCases()
+    } catch (error) {
+      console.error("Failed to delete PPL case", error)
+      alert("Kunde inte ta bort PPL-fallet.")
     }
   }
 
@@ -712,6 +755,10 @@ export default function AdminPage() {
               <TabsTrigger value="news" className="gap-2">
                 <Bell className="h-4 w-4" />
                 Nyheter
+              </TabsTrigger>
+              <TabsTrigger value="cases" className="gap-2">
+                <Briefcase className="h-4 w-4" />
+                PPL-fall
               </TabsTrigger>
             </TabsList>
 
@@ -1352,7 +1399,6 @@ export default function AdminPage() {
               </Card>
             </TabsContent>
 
-            {/* News Tab */}
             <TabsContent value="news" className="space-y-6">
               <Card>
                 <CardHeader>
@@ -1397,6 +1443,94 @@ export default function AdminPage() {
                   )}
                 </CardContent>
               </Card>
+            </TabsContent>
+
+            {/* PPL Cases Tab */}
+            <TabsContent value="cases" className="space-y-6">
+              <div className="flex justify-between items-center bg-card p-4 rounded-lg border border-border">
+                <div>
+                  <h3 className="font-semibold text-lg">Hantering av PPL-fall</h3>
+                  <p className="text-sm text-muted-foreground">Lägg till eller redigera basgruppsfall för olika terminer.</p>
+                </div>
+                <Button onClick={() => setEditingPplCase({ semester: "T1", title: "", description: "" })} className="gap-2">
+                  <Plus className="h-4 w-4" />
+                  Nytt fall
+                </Button>
+              </div>
+
+              {editingPplCase && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>{editingPplCase.id ? "Redigera fall" : "Skapa nytt PPL-fall"}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Termin</Label>
+                        <Select
+                          value={editingPplCase.semester}
+                          onValueChange={(v) => setEditingPplCase(prev => ({ ...prev, semester: v as Semester }))}
+                        >
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {["T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8", "T9", "T10"].map(t => (
+                              <SelectItem key={t} value={t}>{t}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Titel</Label>
+                        <Input
+                          value={editingPplCase.title}
+                          onChange={(e) => setEditingPplCase(prev => ({ ...prev, title: e.target.value }))}
+                          placeholder="T.ex. Fall 1: Bröstsmärta"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Beskrivning / Medicinska nyckelord</Label>
+                      <Textarea
+                        value={editingPplCase.description}
+                        onChange={(e) => setEditingPplCase(prev => ({ ...prev, description: e.target.value }))}
+                        placeholder="Skriv en kort sammanfattning av fallet eller lista de viktigaste medicinska begreppen för AI-rankning..."
+                        rows={6}
+                      />
+                    </div>
+                    <div className="flex justify-end gap-2">
+                      <Button variant="outline" onClick={() => setEditingPplCase(null)}>Avbryt</Button>
+                      <Button onClick={handleSavePplCase} disabled={pplCaseSaveLoading} className="gap-2">
+                        {pplCaseSaveLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+                        Spara
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              <div className="grid gap-4 md:grid-cols-2">
+                {pplCases.map(c => (
+                  <Card key={c.id}>
+                    <CardHeader className="pb-2">
+                      <div className="flex justify-between items-start">
+                        <Badge variant="outline">{c.semester}</Badge>
+                        <div className="flex gap-1">
+                          <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground" onClick={() => setEditingPplCase(c)}>
+                            <Edit2 className="h-4 w-4" />
+                          </Button>
+                          <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={() => handleDeletePplCase(c.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                      <CardTitle className="text-lg">{c.title}</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm text-muted-foreground line-clamp-3">{c.description}</p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
             </TabsContent>
           </Tabs>
         </div>

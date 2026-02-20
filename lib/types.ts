@@ -76,5 +76,6 @@ export interface PPLCase {
   subjectArea: SubjectArea
   title: string
   description: string
+  keywords?: string
   created_at?: string
 }

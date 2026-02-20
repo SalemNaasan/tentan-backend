@@ -22,7 +22,8 @@ export async function GET(req: NextRequest) {
         // Map snake_case to camelCase
         const mappedData = (data || []).map((c: any) => ({
             ...c,
-            subjectArea: c.subject_area
+            subjectArea: c.subject_area,
+            keywords: c.keywords
         }))
 
         return NextResponse.json(mappedData)
@@ -44,6 +45,7 @@ export async function POST(req: NextRequest) {
                 subject_area: body.subjectArea,
                 title: body.title,
                 description: body.description,
+                keywords: body.keywords,
             })
             .select()
             .single()

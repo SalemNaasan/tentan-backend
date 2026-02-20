@@ -1501,6 +1501,14 @@ export default function AdminPage() {
                           placeholder="T.ex. Fall 1: Bröstsmärta"
                         />
                       </div>
+                      <div className="space-y-2">
+                        <Label>Medicinska Nyckelord (Kunskaper)</Label>
+                        <Input
+                          value={editingPplCase.keywords || ""}
+                          onChange={(e) => setEditingPplCase(prev => ({ ...prev, keywords: e.target.value }))}
+                          placeholder="T.ex. Hjärtsvikt, EKG, Troponin (separera med kommatecken)"
+                        />
+                      </div>
                     </div>
                     <div className="space-y-2">
                       <Label>Beskrivning / Medicinska nyckelord</Label>

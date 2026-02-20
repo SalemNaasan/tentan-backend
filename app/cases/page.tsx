@@ -151,10 +151,19 @@ export default function CasesPage() {
                                                 Kunskapsmatchat
                                             </Badge>
                                         </div>
-                                        <h2 className="text-2xl font-bold mb-4">{selectedCase.title}</h2>
-                                        <div className="text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                                        <div className="text-muted-foreground leading-relaxed whitespace-pre-wrap mb-6">
                                             {selectedCase.description}
                                         </div>
+                                        {selectedCase.keywords && (
+                                            <div className="flex flex-wrap gap-2 pt-4 border-t border-border">
+                                                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider w-full mb-1">Matchad kunskap:</span>
+                                                {selectedCase.keywords.split(",").map((kw, i) => (
+                                                    <Badge key={i} variant="secondary" className="bg-primary/5 text-primary border-primary/10 hover:bg-primary/10 transition-colors">
+                                                        {kw.trim()}
+                                                    </Badge>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
 
                                     <div className="space-y-6">

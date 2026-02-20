@@ -73,6 +73,7 @@ export interface NewsItem {
 export interface PPLCase {
   id: string
   semester: Semester
+  subjectArea: SubjectArea
   title: string
   description: string
   created_at?: string

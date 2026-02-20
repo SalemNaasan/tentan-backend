@@ -1452,7 +1452,7 @@ export default function AdminPage() {
                   <h3 className="font-semibold text-lg">Hantering av PPL-fall</h3>
                   <p className="text-sm text-muted-foreground">Lägg till eller redigera basgruppsfall för olika terminer.</p>
                 </div>
-                <Button onClick={() => setEditingPplCase({ semester: "T1", title: "", description: "" })} className="gap-2">
+                <Button onClick={() => setEditingPplCase({ semester: "T1", subjectArea: "pu", title: "", description: "" })} className="gap-2">
                   <Plus className="h-4 w-4" />
                   Nytt fall
                 </Button>
@@ -1475,6 +1475,20 @@ export default function AdminPage() {
                           <SelectContent>
                             {["T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8", "T9", "T10"].map(t => (
                               <SelectItem key={t} value={t}>{t}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Huvudämne (Tema)</Label>
+                        <Select
+                          value={editingPplCase.subjectArea}
+                          onValueChange={(v) => setEditingPplCase(prev => ({ ...prev, subjectArea: v as SubjectArea }))}
+                        >
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {subjects.map(s => (
+                              <SelectItem key={s} value={s}>{subjectLabels[s]}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
@@ -1513,7 +1527,10 @@ export default function AdminPage() {
                   <Card key={c.id}>
                     <CardHeader className="pb-2">
                       <div className="flex justify-between items-start">
-                        <Badge variant="outline">{c.semester}</Badge>
+                        <div className="flex gap-2">
+                          <Badge variant="outline">{c.semester}</Badge>
+                          <Badge variant="secondary">{subjectLabels[c.subjectArea as SubjectArea] || c.subjectArea}</Badge>
+                        </div>
                         <div className="flex gap-1">
                           <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground" onClick={() => setEditingPplCase(c)}>
                             <Edit2 className="h-4 w-4" />

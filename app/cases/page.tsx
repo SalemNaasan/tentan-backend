@@ -145,9 +145,10 @@ export default function CasesPage() {
                                     <div className="bg-card border border-border rounded-3xl p-6 md:p-8 shadow-sm">
                                         <div className="flex flex-wrap items-center gap-2 mb-4">
                                             <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">{selectedCase.semester}</Badge>
+                                            <Badge variant="outline" className="border-primary/20">{selectedCase.subjectArea}</Badge>
                                             <Badge variant="secondary" className="gap-1">
                                                 <Sparkles className="h-3 w-3" />
-                                                AI-Rankat
+                                                Kunskapsmatchat
                                             </Badge>
                                         </div>
                                         <h2 className="text-2xl font-bold mb-4">{selectedCase.title}</h2>

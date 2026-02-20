@@ -19,7 +19,13 @@ export async function GET(req: NextRequest) {
 
         if (error) throw error
 
-        return NextResponse.json(data)
+        // Map snake_case to camelCase
+        const mappedData = (data || []).map((c: any) => ({
+            ...c,
+            subjectArea: c.subject_area
+        }))
+
+        return NextResponse.json(mappedData)
     } catch (error: any) {
         console.error("Cases API Error (GET):", error)
         return NextResponse.json({ error: error.message }, { status: 500 })
@@ -35,6 +41,7 @@ export async function POST(req: NextRequest) {
             .upsert({
                 id: body.id || undefined,
                 semester: body.semester,
+                subject_area: body.subjectArea,
                 title: body.title,
                 description: body.description,
             })

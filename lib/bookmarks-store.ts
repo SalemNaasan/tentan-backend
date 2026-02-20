@@ -30,3 +30,11 @@ export function addBookmarks(questionIds: string[]): string[] {
     localStorage.setItem(BOOKMARKS_KEY, JSON.stringify(next))
     return next
 }
+
+export function removeBookmarks(questionIds: string[]): string[] {
+    const current = getBookmarkedIds()
+    const next = current.filter(id => !questionIds.includes(id))
+
+    localStorage.setItem(BOOKMARKS_KEY, JSON.stringify(next))
+    return next
+}

@@ -26,7 +26,7 @@ import type { Semester, ExamType, ExamPeriod, SubjectArea, Question, Interaction
 
 import { Download, X, Filter, ChevronLeft, ChevronRight, CheckSquare, Square, Star, ArrowUpDown, ArrowUp, ArrowDown, Search } from "lucide-react"
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet"
-import { getBookmarkedIds, toggleBookmark as toggleBookmarkInStore, addBookmarks } from "@/lib/bookmarks-store"
+import { getBookmarkedIds, toggleBookmark as toggleBookmarkInStore, addBookmarks, removeBookmarks } from "@/lib/bookmarks-store"
 
 const PAGE_SIZE = 10
 
@@ -217,7 +217,17 @@ export default function StudyPage() {
 
   const handleBookmarkSelected = () => {
     if (selectedQuestions.length === 0) return
-    const next = addBookmarks(selectedQuestions)
+
+    // If ALL selected are already bookmarked, then REMOVE them
+    // Otherwise, ADD the ones that are missing
+    const allSelectedAreBookmarked = selectedQuestions.every(id => bookmarkedIds.includes(id))
+
+    let next: string[]
+    if (allSelectedAreBookmarked) {
+      next = removeBookmarks(selectedQuestions)
+    } else {
+      next = addBookmarks(selectedQuestions)
+    }
     setBookmarkedIds(next)
   }
 

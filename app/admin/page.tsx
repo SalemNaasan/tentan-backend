@@ -106,6 +106,9 @@ export default function AdminPage() {
   const [pplCasesLoading, setPplCasesLoading] = useState(false)
   const [pplCaseSaveLoading, setPplCaseSaveLoading] = useState(false)
   const [editingPplCase, setEditingPplCase] = useState<Partial<PPLCase> | null>(null)
+  const [importingScoresFor, setImportingScoresFor] = useState<string | null>(null)
+  const [scoresText, setScoresText] = useState("")
+  const [importLoading, setImportLoading] = useState(false)
 
   // Manage tab filters
   const [manageSearchQuery, setManageSearchQuery] = useState("")
@@ -179,6 +182,55 @@ export default function AdminPage() {
       setPplCasesLoading(false)
     }
   }, [])
+
+
+  const handleImportScores = async () => {
+    if (!importingScoresFor || !scoresText.trim()) return
+    setImportLoading(true)
+    try {
+      let parsedScores: { questionId: string, score: number }[] = []
+
+      try {
+        const data = JSON.parse(scoresText)
+        if (Array.isArray(data)) {
+          parsedScores = data
+        } else {
+          parsedScores = Object.entries(data).map(([id, score]) => ({
+            questionId: id,
+            score: Number(score)
+          }))
+        }
+      } catch (e) {
+        parsedScores = scoresText.trim().split("\n").map(line => {
+          const parts = line.trim().split(/[\s,]+/)
+          const id = parts[0]
+          const score = parts[parts.length - 1]
+          return { questionId: id, score: Number(score) || 1 }
+        }).filter(s => s.questionId && s.questionId.length > 5)
+      }
+
+      if (parsedScores.length === 0) throw new Error("Ingen giltig data hittades. Klistra in JSON eller 'ID Poäng' rader.")
+
+      const res = await fetch("/api/cases/scores", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          caseId: importingScoresFor,
+          scores: parsedScores
+        })
+      })
+
+      if (!res.ok) throw new Error("Failed to import")
+
+      alert(`Klart! Importerade ${parsedScores.length} poäng för detta fall.`)
+      setImportingScoresFor(null)
+      setScoresText("")
+    } catch (error: any) {
+      alert("Fel vid import: " + error.message)
+    } finally {
+      setImportLoading(false)
+    }
+  }
 
   useEffect(() => {
     loadAvailableQuestions()
@@ -1540,6 +1592,9 @@ export default function AdminPage() {
                           <Badge variant="secondary">{subjectLabels[c.subjectArea as SubjectArea] || c.subjectArea}</Badge>
                         </div>
                         <div className="flex gap-1">
+                          <Button size="icon" variant="ghost" className="h-8 w-8 text-primary" title="Importera poäng" onClick={() => setImportingScoresFor(c.id)}>
+                            <ArrowUpDown className="h-4 w-4" />
+                          </Button>
                           <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground" onClick={() => setEditingPplCase(c)}>
                             <Edit2 className="h-4 w-4" />
                           </Button>
@@ -1556,6 +1611,35 @@ export default function AdminPage() {
                   </Card>
                 ))}
               </div>
+
+              {importingScoresFor && (
+                <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+                  <Card className="w-full max-w-lg">
+                    <CardHeader>
+                      <CardTitle>Importera Relevanspoäng</CardTitle>
+                      <CardDescription>
+                        Klistra in JSON (array med questionId/score) eller rader med "question_id score".
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <Textarea
+                        value={scoresText}
+                        onChange={(e) => setScoresText(e.target.value)}
+                        placeholder={`custom-123 0.95\ncustom-456 0.82\n...`}
+                        rows={10}
+                        className="font-mono text-sm"
+                      />
+                      <div className="flex justify-end gap-2">
+                        <Button variant="outline" onClick={() => { setImportingScoresFor(null); setScoresText(""); }}>Avbryt</Button>
+                        <Button onClick={handleImportScores} disabled={importLoading || !scoresText.trim()} className="gap-2">
+                          {importLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+                          Importera Data
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
             </TabsContent>
           </Tabs>
         </div>

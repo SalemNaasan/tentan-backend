@@ -34,10 +34,10 @@ const PAGE_SIZE = 10
 
 
 export default function StudyPage() {
-  const [selectedSemesters, setSelectedSemesters] = useState<Semester[]>([])
-  const [selectedExamTypes, setSelectedExamTypes] = useState<ExamType[]>([])
+  const [selectedSemesters, setSelectedSemesters] = useState<Semester[]>(["T1"])
+  const [selectedExamTypes, setSelectedExamTypes] = useState<ExamType[]>(["regular"])
   const [selectedSubjects, setSelectedSubjects] = useState<SubjectArea[]>([])
-  const [selectedPeriods, setSelectedPeriods] = useState<string[]>([])
+  const [selectedPeriods, setSelectedPeriods] = useState<string[]>(["HT25"])
   const [selectedQuestions, setSelectedQuestions] = useState<string[]>([])
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)

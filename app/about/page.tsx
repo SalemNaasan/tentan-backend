@@ -33,6 +33,17 @@ export default function AboutPage() {
               </p>
             </section>
 
+            {/* Creator */}
+            <section>
+              <h2 className="mb-4 text-xl font-semibold text-foreground">Om skaparen</h2>
+              <p className="text-muted-foreground leading-relaxed">
+                Sidan skapades och drivs av <strong>Salem Naasan</strong>, läkarstudent (T2)
+                vid Linköpings universitet. Mitt mål med plattformen är att underlätta
+                studietiden för mina medstudenter genom att tillhandahålla ett smidigt
+                verktyg för tentaövning.
+              </p>
+            </section>
+
             {/* Key Features */}
             <section>
               <h2 className="mb-4 text-xl font-semibold text-foreground">Nyckelfunktioner</h2>

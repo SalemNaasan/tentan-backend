@@ -22,12 +22,24 @@ export default async function HomePage() {
 
       <main className="flex-1">
         {news && news.content && (
-          <div className="bg-primary/10 border-b border-primary/20 px-4 py-3">
-            <div className="mx-auto max-w-5xl flex items-start gap-3 text-sm text-foreground">
-              <Bell className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-              <div className="whitespace-pre-wrap leading-relaxed">{news.content}</div>
+          <section className="bg-muted/30 border-b border-border py-12 px-4">
+            <div className="mx-auto max-w-3xl">
+              <div className="flex items-center gap-2 mb-6 text-primary">
+                <Bell className="h-5 w-5" />
+                <h2 className="text-sm font-semibold uppercase tracking-wider">Senaste nytt</h2>
+              </div>
+              <div className="rounded-2xl border border-border bg-card p-6 md:p-8 shadow-sm scale-[1.02] transition-transform">
+                <div className="whitespace-pre-wrap leading-relaxed text-foreground/90 text-lg">
+                  {news.content}
+                </div>
+                {news.updated_at && (
+                  <div className="mt-6 pt-6 border-t border-border flex items-center justify-between text-xs text-muted-foreground">
+                    <span>Publicerat: {new Date(news.updated_at).toLocaleDateString('sv-SE', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
+          </section>
         )}
 
         {/* Hero Section */}

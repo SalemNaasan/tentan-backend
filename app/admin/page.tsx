@@ -387,11 +387,12 @@ export default function AdminPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content: newsContent })
       })
-      if (!res.ok) throw new Error("Failed to save news")
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "Failed to save news")
       alert("Nyheter sparade!")
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to save news", error)
-      alert("Kunde inte spara nyheter.")
+      alert(`Kunde inte spara nyheter: ${error.message}`)
     } finally {
       setSaveLoading(false)
     }
@@ -1374,8 +1375,8 @@ export default function AdminPage() {
                           placeholder="Skriv vad som händer här..."
                           value={newsContent}
                           onChange={(e) => setNewsContent(e.target.value)}
-                          rows={15}
-                          className="font-sans text-base leading-relaxed"
+                          rows={25}
+                          className="font-sans text-base leading-relaxed min-h-[400px]"
                         />
                       </div>
                       <div className="flex justify-end">

@@ -4,6 +4,10 @@ import { Question, PPLCase } from "@/lib/types"
 
 export const dynamic = "force-dynamic"
 
+const STOP_WORDS = new Set([
+    "och", "att", "är", "en", "ett", "på", "i", "med", "som", "för", "den", "det", "till", "från", "av", "om", "eller", "men", "vad", "vem", "vilka", "har", "hade", "ska", "skulle", "kan", "kunde", "man", "vid", "inte", "under", "över", "efter", "före", "hos", "genom", "mellan", "mot", "the", "and", "is", "a", "an", "to", "in", "it", "of", "with"
+])
+
 /**
  * Dice's Coefficient to measure similarity between two strings.
  * Returns a value between 0 (completely different) and 1 (identical).
@@ -14,12 +18,14 @@ function getSimilarity(s1: string, s2: string): number {
 
     const set1 = new Set()
     for (let i = 0; i < str1.length - 1; i++) {
-        set1.add(str1.substring(i, i + 2))
+        const bigram = str1.substring(i, i + 2)
+        if (!bigram.includes(" ")) set1.add(bigram)
     }
 
     const set2 = new Set()
     for (let i = 0; i < str2.length - 1; i++) {
-        set2.add(str2.substring(i, i + 2))
+        const bigram = str2.substring(i, i + 2)
+        if (!bigram.includes(" ")) set2.add(bigram)
     }
 
     const intersection = new Set([...set1].filter((x) => set2.has(x)))
@@ -33,25 +39,39 @@ function getSimilarity(s1: string, s2: string): number {
  * Calculates a relevance score for a question based on a case.
  */
 function calculateRelevance(question: Question, pplCase: PPLCase): number {
-    const caseText = (pplCase.title + " " + pplCase.description).toLowerCase()
-    const questionText = (question.questionText + " " + question.answer).toLowerCase()
+    const caseTitle = pplCase.title.toLowerCase()
+    const caseDesc = pplCase.description.toLowerCase()
+    const qText = question.questionText.toLowerCase()
+    const qAnswer = question.answer.toLowerCase()
+    const fullQ = (qText + " " + qAnswer).toLowerCase()
 
-    // 1. Text similarity (Dice's Coefficient)
-    const similarity = getSimilarity(caseText, questionText)
+    // 1. Title matching (High weight)
+    let titleBonus = 0
+    const titleKeywords = caseTitle.split(/\s+/).filter(w => w.length > 3 && !STOP_WORDS.has(w))
+    titleKeywords.forEach(kw => {
+        if (fullQ.includes(kw)) titleBonus += 0.2
+    })
 
-    // 2. Keyword matching (weighted)
-    const keywords = caseText.split(/\s+/).filter(word => word.length > 3)
+    // 2. Keyword matching with weight by length
+    const keywords = caseDesc.split(/\s+/).filter(word => word.length > 3 && !STOP_WORDS.has(word))
     let keywordMatches = 0
+    let weightedMatches = 0
+
     keywords.forEach(word => {
-        if (questionText.includes(word)) {
+        if (fullQ.includes(word)) {
             keywordMatches++
+            // Give more importance to specific medical terms (usually longer)
+            weightedMatches += word.length > 6 ? 2 : 1
         }
     })
 
-    const keywordScore = keywords.length > 0 ? keywordMatches / keywords.length : 0
+    const keywordScore = keywords.length > 0 ? weightedMatches / keywords.length : 0
 
-    // Combine scores (adjust weights as needed)
-    return (similarity * 0.4) + (keywordScore * 0.6)
+    // 3. Overall Text similarity
+    const similarityScore = getSimilarity(caseDesc, fullQ)
+
+    // Weighted result
+    return (titleBonus * 0.3) + (keywordScore * 0.5) + (similarityScore * 0.2)
 }
 
 export async function GET(req: NextRequest) {
@@ -80,24 +100,37 @@ export async function GET(req: NextRequest) {
 
         if (questionsError) throw questionsError
 
-        // 3. Rank questions
+        // 3. Rank and MAP questions to camelCase
         const rankedQuestions = (questions as any[])
             .map((q) => {
-                // Convert snake_case from DB to camelCase for the algorithm if needed, 
-                // but here we just need text content
+                // IMPORTANT: Map snake_case to camelCase so QuestionCard can display it
                 const questionObj: Question = {
-                    ...q,
-                    questionText: q.question_text,
-                    answer: q.answer || q.correct_answer || ""
+                    id: q.id,
+                    semester: q.semester,
+                    examType: q.exam_type || q.examType,
+                    examDate: q.exam_date || q.examDate,
+                    examPeriod: q.exam_period || q.examPeriod,
+                    subjectArea: q.subject_area || q.subjectArea,
+                    questionNumber: q.question_number || q.questionNumber,
+                    questionText: q.question_text || q.questionText || "",
+                    interaction: q.interaction,
+                    options: q.options,
+                    correctAnswer: q.correct_answer || q.correctAnswer,
+                    answer: q.answer || q.correct_answer || "",
+                    points: q.points,
+                    imageUrl: q.image_url || q.imageUrl,
+                    isHidden: q.is_hidden || q.isHidden
                 }
+
                 return {
-                    ...q,
+                    ...questionObj,
                     relevance: calculateRelevance(questionObj, pplCase)
                 }
             })
+            .filter(q => q.relevance > 0.05) // Filter out clearly unrelated stuff
             .sort((a, b) => b.relevance - a.relevance)
 
-        // Return the top results (e.g., top 50)
+        // Return the top results
         return NextResponse.json(rankedQuestions.slice(0, 50))
     } catch (error: any) {
         console.error("Rank API Error:", error)

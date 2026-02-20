@@ -109,6 +109,8 @@ export default function AdminPage() {
   const [importingScoresFor, setImportingScoresFor] = useState<string | null>(null)
   const [scoresText, setScoresText] = useState("")
   const [importLoading, setImportLoading] = useState(false)
+  const [currentCaseScores, setCurrentCaseScores] = useState<{ questionId: string, score: number }[]>([])
+  const [loadingScores, setLoadingScores] = useState(false)
 
   // Manage tab filters
   const [manageSearchQuery, setManageSearchQuery] = useState("")
@@ -223,12 +225,26 @@ export default function AdminPage() {
       if (!res.ok) throw new Error("Failed to import")
 
       alert(`Klart! Importerade ${parsedScores.length} poäng för detta fall.`)
-      setImportingScoresFor(null)
       setScoresText("")
+      loadCaseScores(importingScoresFor)
     } catch (error: any) {
       alert("Fel vid import: " + error.message)
     } finally {
       setImportLoading(false)
+    }
+  }
+
+  const loadCaseScores = async (caseId: string) => {
+    setLoadingScores(true)
+    try {
+      const res = await fetch(`/api/cases/scores?caseId=${caseId}`)
+      if (!res.ok) throw new Error("Failed to fetch")
+      const data = await res.json()
+      setCurrentCaseScores(data)
+    } catch (error) {
+      console.error(error)
+    } finally {
+      setLoadingScores(false)
     }
   }
 
@@ -247,6 +263,14 @@ export default function AdminPage() {
   useEffect(() => {
     loadPPLCases()
   }, [loadPPLCases])
+
+  useEffect(() => {
+    if (importingScoresFor) {
+      loadCaseScores(importingScoresFor)
+    } else {
+      setCurrentCaseScores([])
+    }
+  }, [importingScoresFor])
 
   const handleFileUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -1626,9 +1650,24 @@ export default function AdminPage() {
                         value={scoresText}
                         onChange={(e) => setScoresText(e.target.value)}
                         placeholder={`custom-123 0.95\ncustom-456 0.82\n...`}
-                        rows={10}
+                        rows={5}
                         className="font-mono text-sm"
                       />
+
+                      {currentCaseScores.length > 0 && (
+                        <div className="space-y-2">
+                          <Label className="text-xs text-muted-foreground uppercase tracking-wider">Nuvarande sparade frågor ({currentCaseScores.length})</Label>
+                          <div className="max-h-40 overflow-y-auto border rounded-md p-2 bg-muted/50 space-y-1">
+                            {currentCaseScores.map((s, i) => (
+                              <div key={i} className="flex justify-between text-xs font-mono">
+                                <span className="truncate mr-2">{s.questionId}</span>
+                                <span className="font-bold text-primary">{s.score}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
                       <div className="flex justify-end gap-2">
                         <Button variant="outline" onClick={() => { setImportingScoresFor(null); setScoresText(""); }}>Avbryt</Button>
                         <Button onClick={handleImportScores} disabled={importLoading || !scoresText.trim()} className="gap-2">

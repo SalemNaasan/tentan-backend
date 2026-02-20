@@ -22,15 +22,7 @@ export async function GET(req: NextRequest) {
 
         if (caseError) throw caseError
 
-        // 2. Fetch all questions for that semester
-        const { data: questions, error: questionsError } = await supabase
-            .from("custom_questions")
-            .select("*")
-            .eq("semester", pplCaseData.semester)
-
-        if (questionsError) throw questionsError
-
-        // 3. Fetch PRE-CALCULATED scores for this case
+        // 2. Fetch PRE-CALCULATED scores for this case
         const { data: storedScores, error: scoresError } = await supabase
             .from("case_question_scores")
             .select("question_id, score")
@@ -38,12 +30,26 @@ export async function GET(req: NextRequest) {
 
         if (scoresError) throw scoresError
 
+        if (!storedScores || storedScores.length === 0) {
+            return NextResponse.json([])
+        }
+
+        const questionIds = storedScores.map(s => s.question_id)
+
+        // 3. Fetch ONLY the questions that have scores
+        const { data: questions, error: questionsError } = await supabase
+            .from("custom_questions")
+            .select("*")
+            .in("id", questionIds)
+
+        if (questionsError) throw questionsError
+
         // Create a lookup map for scores
-        const scoreMap = new Map(storedScores.map(s => [s.question_id, s.score]))
+        const scoreMap = new Map(storedScores.map(s => [s.question_id.trim(), s.score]))
 
         // 4. Map questions and attach scores
-        const rankedQuestions = (questions as any[])
-            .map((q) => {
+        const rankedQuestions = (questions || [])
+            .map((q: any) => {
                 const questionObj: Question = {
                     id: q.id,
                     semester: q.semester,
@@ -62,13 +68,16 @@ export async function GET(req: NextRequest) {
                     isHidden: q.is_hidden
                 }
 
+                // Try trim mapping if direct fails
+                const relevance = scoreMap.get(q.id) ?? scoreMap.get(q.id.trim()) ?? 0
+
                 return {
                     ...questionObj,
-                    relevance: scoreMap.get(q.id) || 0 // Use stored score or 0
+                    relevance
                 }
             })
-            .filter(q => q.relevance > 0) // Only show questions that have a positive score
-            .sort((a, b) => b.relevance - a.relevance) // Highest score first
+            .filter(q => q.relevance > 0)
+            .sort((a, b) => b.relevance - a.relevance)
 
         return NextResponse.json(rankedQuestions)
     } catch (error: any) {

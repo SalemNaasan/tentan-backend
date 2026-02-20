@@ -26,7 +26,7 @@ import type { Semester, ExamType, ExamPeriod, SubjectArea, Question, Interaction
 
 import { Download, X, Filter, ChevronLeft, ChevronRight, CheckSquare, Square, Star, ArrowUpDown, ArrowUp, ArrowDown, Search } from "lucide-react"
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet"
-import { getBookmarkedIds, toggleBookmark as toggleBookmarkInStore } from "@/lib/bookmarks-store"
+import { getBookmarkedIds, toggleBookmark as toggleBookmarkInStore, addBookmarks } from "@/lib/bookmarks-store"
 
 const PAGE_SIZE = 10
 
@@ -215,6 +215,12 @@ export default function StudyPage() {
     }
   }
 
+  const handleBookmarkSelected = () => {
+    if (selectedQuestions.length === 0) return
+    const next = addBookmarks(selectedQuestions)
+    setBookmarkedIds(next)
+  }
+
   const clearAllFilters = () => {
     setSelectedSemesters([])
     setSelectedExamTypes([])
@@ -328,6 +334,15 @@ export default function StudyPage() {
                         className="h-9 px-4 text-sm gap-2 bg-[#0066FF] hover:bg-[#0052CC] text-white border-none shadow-sm transition-all"
                       >
                         Exportera till Anki
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleBookmarkSelected}
+                        className="h-9 px-4 text-sm gap-2 border-yellow-200 hover:bg-yellow-50 text-yellow-700 transition-all"
+                      >
+                        <Star className="h-4 w-4 fill-yellow-500 text-yellow-500" />
+                        Bokmärk markerade
                       </Button>
                     </div>
                   )}

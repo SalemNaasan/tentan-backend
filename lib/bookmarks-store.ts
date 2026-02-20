@@ -20,3 +20,13 @@ export function toggleBookmark(questionId: string): string[] {
     localStorage.setItem(BOOKMARKS_KEY, JSON.stringify(next))
     return next
 }
+
+export function addBookmarks(questionIds: string[]): string[] {
+    const current = getBookmarkedIds()
+    const newIds = questionIds.filter(id => !current.includes(id))
+    if (newIds.length === 0) return current
+
+    const next = [...current, ...newIds]
+    localStorage.setItem(BOOKMARKS_KEY, JSON.stringify(next))
+    return next
+}

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -20,6 +20,7 @@ import type { Question } from "@/lib/types"
 import { ChevronDown, ChevronUp, Eye, EyeOff, MessageSquare, CheckCircle2, XCircle, RotateCcw, Star } from "lucide-react"
 import { QuestionRenderer } from "./question-renderers/question-renderer"
 import { cn } from "@/lib/utils"
+import { getUserAnswer, saveUserAnswer } from "@/lib/answers-store"
 
 interface QuestionCardProps {
   question: Question
@@ -49,6 +50,43 @@ export function QuestionCard({
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null)
   const [showCorrectAnswer, setShowCorrectAnswer] = useState(false)
 
+  // Load saved state on mount or when question ID changes
+  useEffect(() => {
+    const saved = getUserAnswer(question.id)
+    if (saved) {
+      setUserAnswer(saved.answer)
+      setIsChecked(saved.isChecked || false)
+      setIsCorrect(saved.isCorrect !== undefined ? saved.isCorrect : null)
+      setShowCorrectAnswer(saved.showCorrectAnswer || false)
+      if (saved.showAnswer) setShowAnswer(true)
+    } else {
+      // Reset if no saved data
+      setUserAnswer(null)
+      setIsChecked(false)
+      setIsCorrect(null)
+      setShowCorrectAnswer(false)
+      setShowAnswer(false)
+    }
+  }, [question.id])
+
+  // Save state whenever it changes
+  const persistState = (updates: any) => {
+    const currentState = {
+      answer: userAnswer,
+      isChecked,
+      isCorrect,
+      showCorrectAnswer,
+      showAnswer,
+      ...updates
+    }
+    saveUserAnswer(question.id, currentState)
+  }
+
+  const handleAnswerUpdate = (val: any) => {
+    setUserAnswer(val)
+    persistState({ answer: val })
+  }
+
 
   const handleFeedbackSubmit = () => {
     const text = feedbackText.trim()
@@ -73,6 +111,7 @@ export function QuestionCard({
 
       setIsCorrect(correct)
       setIsChecked(true)
+      persistState({ isCorrect: correct, isChecked: true })
     } else if (question.interaction === "drag_matching") {
       let parsedCorrect: Record<string, string> = {}
       try {
@@ -88,6 +127,7 @@ export function QuestionCard({
 
       setIsCorrect(correct)
       setIsChecked(true)
+      persistState({ isCorrect: correct, isChecked: true })
     } else if (question.interaction === "drag_ordering") {
       let parsedCorrect: string[] = []
       try {
@@ -103,6 +143,7 @@ export function QuestionCard({
 
       setIsCorrect(correct)
       setIsChecked(true)
+      persistState({ isCorrect: correct, isChecked: true })
     }
   }
 
@@ -112,6 +153,14 @@ export function QuestionCard({
     setIsCorrect(null)
     setShowAnswer(false)
     setShowCorrectAnswer(false)
+    // Clear in store
+    persistState({
+      answer: null,
+      isChecked: false,
+      isCorrect: null,
+      showAnswer: false,
+      showCorrectAnswer: false
+    })
   }
 
 
@@ -215,7 +264,7 @@ export function QuestionCard({
               <QuestionRenderer
                 question={question}
                 userAnswer={userAnswer}
-                onAnswerChange={setUserAnswer}
+                onAnswerChange={handleAnswerUpdate}
                 disabled={isChecked}
                 showCorrect={isChecked}
                 revealAnswer={showCorrectAnswer}
@@ -280,7 +329,10 @@ export function QuestionCard({
                       {!isCorrect && !showCorrectAnswer && (
                         <Button
                           variant="outline"
-                          onClick={() => setShowCorrectAnswer(true)}
+                          onClick={() => {
+                            setShowCorrectAnswer(true)
+                            persistState({ showCorrectAnswer: true })
+                          }}
                           className="gap-2 border-green-200 hover:bg-green-50 text-green-700"
                         >
                           <Eye className="h-4 w-4" />
@@ -292,7 +344,11 @@ export function QuestionCard({
                 ) : (
                   <Button
                     variant="outline"
-                    onClick={() => setShowAnswer(!showAnswer)}
+                    onClick={() => {
+                      const next = !showAnswer
+                      setShowAnswer(next)
+                      persistState({ showAnswer: next })
+                    }}
                     className="gap-2"
                   >
                     {showAnswer ? (

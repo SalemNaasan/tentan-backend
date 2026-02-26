@@ -6,6 +6,7 @@ type AnkiCard = {
   front: string
   back: string
   imageUrl?: string
+  options?: string[]
 }
 
 type AnkiExportRequestBody = {
@@ -29,6 +30,15 @@ export async function POST(req: NextRequest) {
       }
 
       let frontContent = card.front
+
+      if (card.options && Array.isArray(card.options) && card.options.length > 0) {
+        const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        const optionsText = card.options
+          .map((opt, i) => `${alphabet[i] || i + 1}. ${opt}`)
+          .join("<br>")
+        frontContent += `<br><br>${optionsText}`
+      }
+
       const backContent = card.back
 
       if (card.imageUrl) {

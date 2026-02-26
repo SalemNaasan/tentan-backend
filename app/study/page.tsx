@@ -186,6 +186,7 @@ export default function StudyPage() {
         front: q.questionText,
         back: q.answer,
         imageUrl: q.imageUrl,
+        options: q.options,
       })),
     }
 

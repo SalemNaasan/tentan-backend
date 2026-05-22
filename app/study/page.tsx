@@ -180,14 +180,139 @@ export default function StudyPage() {
       return
     }
 
+    const cards = questionsToExport.map((q) => {
+      let front = q.questionText
+      let back = q.answer || ""
+      let options = q.options
+
+      if (q.interaction === "drag_matching") {
+        // Parse options: "Source|Target"
+        const parsedSources: string[] = []
+        const parsedTargets: string[] = []
+        
+        if (q.options) {
+          q.options.forEach((opt) => {
+            const parts = opt.split("|").map(s => s.trim())
+            if (parts.length >= 2) {
+              parsedSources.push(parts[0])
+              parsedTargets.push(parts[1])
+            }
+          })
+        }
+
+        // Shuffled explanations for the front side to test the user
+        const shuffledTargets = [...parsedTargets].sort(() => Math.random() - 0.5)
+
+        // Build front content
+        let frontExtra = "<br><br><b>Matcha följande begrepp:</b><br>"
+        parsedSources.forEach((src) => {
+          frontExtra += `• ${src}<br>`
+        })
+        frontExtra += "<br><b>Med rätt förklaring:</b><br>"
+        shuffledTargets.forEach((tgt) => {
+          frontExtra += `• ${tgt}<br>`
+        })
+        front = q.questionText + frontExtra
+
+        // Parse correct answers
+        let correctAnswerMap: Record<string, string> = {}
+        try {
+          correctAnswerMap = typeof q.correctAnswer === "string"
+            ? JSON.parse(q.correctAnswer)
+            : (q.correctAnswer as any) || {}
+        } catch (e) {}
+
+        // Build back content showing correct matches
+        let backExtra = "<b>Rätt matchning:</b><br>"
+        parsedSources.forEach((src, i) => {
+          const srcId = `src-${i}`
+          const correctTargetId = correctAnswerMap[srcId]
+          let correctTargetContent = ""
+          if (correctTargetId && correctTargetId.startsWith("target-")) {
+            const targetIdx = parseInt(correctTargetId.replace("target-", ""), 10)
+            correctTargetContent = parsedTargets[targetIdx] || ""
+          } else {
+            // Fallback to index mapping if correct mapping is missing or invalid
+            correctTargetContent = parsedTargets[i] || ""
+          }
+          backExtra += `• <b>${src}</b> → ${correctTargetContent}<br>`
+        })
+
+        back = backExtra + (q.answer ? `<br><br><b>Förklaring:</b><br>${q.answer}` : "")
+        // Prevent default options appending in the API route
+        options = undefined
+      } else if (q.interaction === "drag_ordering") {
+        // Parse correct order
+        let parsedCorrectOrder: string[] = []
+        try {
+          parsedCorrectOrder = typeof q.correctAnswer === "string"
+            ? JSON.parse(q.correctAnswer)
+            : (q.correctAnswer as any) || []
+        } catch (e) {}
+
+        if (!Array.isArray(parsedCorrectOrder) || parsedCorrectOrder.length === 0) {
+          // Fallback if not JSON or empty
+          parsedCorrectOrder = q.options || []
+        }
+
+        // Build front content with elements
+        let frontExtra = "<br><br><b>Sortera följande i rätt ordning:</b><br>"
+        if (q.options) {
+          q.options.forEach((opt) => {
+            frontExtra += `• ${opt}<br>`
+          })
+        }
+        front = q.questionText + frontExtra
+
+        // Build back content showing correct order
+        let backExtra = "<b>Rätt ordning:</b><br>"
+        parsedCorrectOrder.forEach((item, idx) => {
+          backExtra += `${idx + 1}. ${item}<br>`
+        })
+
+        back = backExtra + (q.answer ? `<br><br><b>Förklaring:</b><br>${q.answer}` : "")
+        // Prevent default options appending in the API route
+        options = undefined
+      } else if (q.interaction === "check_answers") {
+        // Parse correct answers (e.g. ["a", "b"])
+        const correctAnswers = Array.isArray(q.correctAnswer)
+          ? q.correctAnswer
+          : q.correctAnswer
+            ? [q.correctAnswer as string]
+            : []
+        
+        const correctIndices = correctAnswers.map((ans) => {
+          const cleanAns = ans.trim().toLowerCase()
+          if (cleanAns.length === 1) {
+            return cleanAns.charCodeAt(0) - 97
+          }
+          return (q.options || []).findIndex(
+            (opt) => opt.toLowerCase().includes(cleanAns)
+          )
+        }).filter(idx => idx >= 0 && idx < (q.options || []).length)
+
+        if (correctIndices.length > 0 && q.options) {
+          const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+          const correctLabels = correctIndices
+            .map((idx) => `${alphabet[idx] || idx + 1}: ${q.options![idx]}`)
+            .join("<br>")
+          
+          let backExtra = `<b>Rätt svar:</b><br>${correctLabels}<br>`
+          back = backExtra + (q.answer ? `<br><b>Förklaring:</b><br>${q.answer}` : "")
+        }
+      }
+
+      return {
+        front,
+        back,
+        imageUrl: q.imageUrl,
+        options,
+      }
+    })
+
     const payload = {
       deckName: "tentan.nu - Övningsfrågor",
-      cards: questionsToExport.map((q) => ({
-        front: q.questionText,
-        back: q.answer,
-        imageUrl: q.imageUrl,
-        options: q.options,
-      })),
+      cards,
     }
 
     try {

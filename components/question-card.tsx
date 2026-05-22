@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, ReactNode } from "react"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -29,6 +29,7 @@ interface QuestionCardProps {
   onFeedbackSubmit?: (questionId: string, questionPreview: string, feedbackText: string) => void
   isBookmarked?: boolean
   onToggleBookmark?: () => void
+  searchQuery?: string
 }
 
 export function QuestionCard({
@@ -38,6 +39,7 @@ export function QuestionCard({
   onFeedbackSubmit,
   isBookmarked,
   onToggleBookmark,
+  searchQuery,
 }: QuestionCardProps) {
   const [showAnswer, setShowAnswer] = useState(false)
   const [isExpanded, setIsExpanded] = useState(true)
@@ -49,6 +51,20 @@ export function QuestionCard({
   const [isChecked, setIsChecked] = useState(false)
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null)
   const [showCorrectAnswer, setShowCorrectAnswer] = useState(false)
+
+  // Helper: highlight search query matches in text
+  const highlightText = (text: string): ReactNode => {
+    if (!searchQuery || !searchQuery.trim()) return text
+    const query = searchQuery.trim()
+    const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi')
+    const parts = text.split(regex)
+    if (parts.length === 1) return text
+    return parts.map((part, i) =>
+      regex.test(part) ? (
+        <mark key={i} className="bg-yellow-200 dark:bg-yellow-500/40 text-foreground rounded-sm px-0.5 py-0">{part}</mark>
+      ) : part
+    )
+  }
 
   // Load saved state on mount or when question ID changes
   useEffect(() => {
@@ -242,7 +258,7 @@ export function QuestionCard({
             {/* Question Text */}
             <div className="rounded-lg bg-secondary/30 p-4 border border-border/50">
               <p className="text-foreground leading-relaxed font-medium whitespace-pre-wrap">
-                {question.questionText}
+                {highlightText(question.questionText)}
               </p>
             </div>
 
@@ -268,6 +284,7 @@ export function QuestionCard({
                 disabled={isChecked}
                 showCorrect={isChecked}
                 revealAnswer={showCorrectAnswer}
+                searchQuery={searchQuery}
               />
 
             </div>
@@ -408,7 +425,7 @@ export function QuestionCard({
                     Korrekt Svar / Förklaring
                   </h4>
                   <p className="text-foreground leading-relaxed whitespace-pre-wrap">
-                    {question.answer}
+                    {highlightText(question.answer)}
                   </p>
                 </div>
               </div>

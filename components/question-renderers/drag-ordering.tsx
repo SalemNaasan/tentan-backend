@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useEffect } from "react"
+import { useState, useMemo, useEffect, ReactNode } from "react"
 import {
     DndContext,
     closestCenter,
@@ -32,6 +32,7 @@ interface DragOrderingRendererProps {
     showCorrect?: boolean
     revealAnswer?: boolean
     correctAnswer: string[] // Correct order of item IDs
+    searchQuery?: string
 }
 
 export function DragOrderingRenderer({
@@ -42,8 +43,23 @@ export function DragOrderingRenderer({
     showCorrect,
     revealAnswer,
     correctAnswer,
+    searchQuery,
 }: DragOrderingRendererProps) {
     const [activeId, setActiveId] = useState<string | null>(null)
+
+    // Helper: highlight search query matches in text
+    const highlightText = (text: string): ReactNode => {
+        if (!searchQuery || !searchQuery.trim()) return text
+        const query = searchQuery.trim()
+        const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi')
+        const parts = text.split(regex)
+        if (parts.length === 1) return text
+        return parts.map((part, i) =>
+            regex.test(part) ? (
+                <mark key={i} className="bg-yellow-200 dark:bg-yellow-500/40 text-inherit rounded-sm px-0.5 py-0">{part}</mark>
+            ) : part
+        )
+    }
 
     // Map options to objects with IDs for dnd-kit
     const items = useMemo(() => {
@@ -119,6 +135,7 @@ export function DragOrderingRenderer({
                                     disabled={disabled}
                                     isCorrect={isCorrect}
                                     showCorrect={showCorrect || revealAnswer}
+                                    highlightText={highlightText}
                                 />
                             )
                         })}
@@ -151,7 +168,7 @@ export function DragOrderingRenderer({
                                 <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">
                                     {i + 1}
                                 </span>
-                                <span className="font-medium text-foreground">{text}</span>
+                                <span className="font-medium text-foreground">{highlightText(text)}</span>
                             </div>
                         ))}
                     </div>
@@ -166,13 +183,15 @@ function SortableItem({
     content,
     disabled,
     isCorrect,
-    showCorrect
+    showCorrect,
+    highlightText
 }: {
     id: string;
     content: string;
     disabled?: boolean;
     isCorrect?: boolean;
     showCorrect?: boolean;
+    highlightText?: (text: string) => ReactNode;
 }) {
     const {
         attributes,
@@ -205,7 +224,7 @@ function SortableItem({
             {...listeners}
         >
             {!disabled && <GripVertical className="h-4 w-4 text-muted-foreground shrink-0" />}
-            <span className="text-sm font-medium flex-1">{content}</span>
+            <span className="text-sm font-medium flex-1">{highlightText ? highlightText(content) : content}</span>
             {showCorrect && (
                 <div className={cn(
                     "absolute right-2 top-1/2 -translate-y-1/2 flex h-5 w-5 items-center justify-center rounded-full",

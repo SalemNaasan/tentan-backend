@@ -13,6 +13,7 @@ interface QuestionRendererProps {
     disabled?: boolean
     showCorrect?: boolean
     revealAnswer?: boolean
+    searchQuery?: string
 }
 
 export function QuestionRenderer({
@@ -21,7 +22,8 @@ export function QuestionRenderer({
     onAnswerChange,
     disabled,
     showCorrect,
-    revealAnswer
+    revealAnswer,
+    searchQuery
 }: QuestionRendererProps) {
     if (question.interaction === "check_answers") {
         const correctAnswers = Array.isArray(question.correctAnswer)
@@ -38,6 +40,7 @@ export function QuestionRenderer({
                 showCorrect={showCorrect}
                 revealAnswer={revealAnswer}
                 correctAnswers={correctAnswers}
+                searchQuery={searchQuery}
             />
         )
     }
@@ -59,6 +62,7 @@ export function QuestionRenderer({
                 showCorrect={showCorrect}
                 revealAnswer={revealAnswer}
                 correctAnswer={parsedCorrect}
+                searchQuery={searchQuery}
             />
         )
     }
@@ -80,6 +84,7 @@ export function QuestionRenderer({
                 showCorrect={showCorrect}
                 revealAnswer={revealAnswer}
                 correctAnswer={parsedCorrect}
+                searchQuery={searchQuery}
             />
         )
     }

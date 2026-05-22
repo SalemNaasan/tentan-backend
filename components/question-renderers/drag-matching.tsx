@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useId } from "react"
+import { useState, useEffect, useId, ReactNode } from "react"
 import {
     DndContext,
     closestCenter,
@@ -34,6 +34,7 @@ interface DragMatchingRendererProps {
     showCorrect?: boolean
     revealAnswer?: boolean
     correctAnswer: Record<string, string>
+    searchQuery?: string
 }
 
 export function DragMatchingRenderer({
@@ -44,10 +45,25 @@ export function DragMatchingRenderer({
     showCorrect,
     revealAnswer,
     correctAnswer,
+    searchQuery,
 }: DragMatchingRendererProps) {
     const [sources, setSources] = useState<Item[]>([])
     const [availableTargets, setAvailableTargets] = useState<Item[]>([])
     const [activeId, setActiveId] = useState<string | null>(null)
+
+    // Helper: highlight search query matches in text
+    const highlightText = (text: string): ReactNode => {
+        if (!searchQuery || !searchQuery.trim()) return text
+        const query = searchQuery.trim()
+        const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi')
+        const parts = text.split(regex)
+        if (parts.length === 1) return text
+        return parts.map((part, i) =>
+            regex.test(part) ? (
+                <mark key={i} className="bg-yellow-200 dark:bg-yellow-500/40 text-inherit rounded-sm px-0.5 py-0">{part}</mark>
+            ) : part
+        )
+    }
 
     // Parse options: "Source|Target"
     useEffect(() => {
@@ -145,7 +161,7 @@ export function DragMatchingRenderer({
                             return (
                                 <div key={src.id} className="flex flex-col gap-2">
                                     <div className="p-3 bg-secondary/20 rounded-lg border border-border font-medium">
-                                        {src.content}
+                                        {highlightText(src.content)}
                                     </div>
                                     {/* Drop Zone */}
                                     <DropZone

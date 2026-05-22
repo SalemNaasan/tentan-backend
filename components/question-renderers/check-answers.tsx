@@ -1,6 +1,6 @@
 "use client"
 
-import { useId } from "react"
+import { useId, ReactNode } from "react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
@@ -13,6 +13,7 @@ interface CheckAnswersRendererProps {
     showCorrect?: boolean
     revealAnswer?: boolean
     correctAnswers?: string[]
+    searchQuery?: string
 }
 
 export function CheckAnswersRenderer({
@@ -22,9 +23,25 @@ export function CheckAnswersRenderer({
     disabled,
     showCorrect,
     revealAnswer,
-    correctAnswers
+    correctAnswers,
+    searchQuery
 }: CheckAnswersRendererProps) {
     const baseId = useId()
+
+    // Helper: highlight search query matches in text
+    const highlightText = (text: string): ReactNode => {
+        if (!searchQuery || !searchQuery.trim()) return text
+        const query = searchQuery.trim()
+        const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi')
+        const parts = text.split(regex)
+        if (parts.length === 1) return text
+        return parts.map((part, i) =>
+            regex.test(part) ? (
+                <mark key={i} className="bg-yellow-200 dark:bg-yellow-500/40 text-inherit rounded-sm px-0.5 py-0">{part}</mark>
+            ) : part
+        )
+    }
+
     const handleToggle = (key: string) => {
         if (value.includes(key)) {
             onChange(value.filter((val) => val !== key))
@@ -67,7 +84,7 @@ export function CheckAnswersRenderer({
                                 showError && "font-medium text-red-700"
                             )}
                         >
-                            {option}
+                            {highlightText(option)}
                         </Label>
                     </div>
                 )

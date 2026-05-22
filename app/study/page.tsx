@@ -104,7 +104,14 @@ export default function StudyPage() {
         const matchesText = q.questionText.toLowerCase().includes(query)
         const matchesNumber = q.questionNumber.toString().includes(query)
         const matchesSubject = q.subjectArea.toLowerCase().includes(query)
-        if (!matchesText && !matchesNumber && !matchesSubject) {
+        const matchesAnswer = q.answer?.toLowerCase().includes(query) || false
+        const matchesOptions = q.options?.some(opt => opt.toLowerCase().includes(query)) || false
+        const matchesCorrectAnswer = typeof q.correctAnswer === "string"
+          ? q.correctAnswer.toLowerCase().includes(query)
+          : Array.isArray(q.correctAnswer)
+            ? q.correctAnswer.some(ca => ca.toLowerCase().includes(query))
+            : false
+        if (!matchesText && !matchesNumber && !matchesSubject && !matchesAnswer && !matchesOptions && !matchesCorrectAnswer) {
           return false
         }
       }
@@ -440,7 +447,7 @@ export default function StudyPage() {
                   <div className="relative flex-1 max-w-md">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
-                      placeholder="Sök i frågor (text, nummer, ämne)..."
+                      placeholder="Sök i frågor, svar och alternativ..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className="pl-9 h-11 bg-secondary/30 border-border/50 focus:bg-background transition-all"
@@ -677,6 +684,7 @@ export default function StudyPage() {
                       onFeedbackSubmit={handleFeedbackSubmit}
                       isBookmarked={bookmarkedIds.includes(question.id)}
                       onToggleBookmark={() => handleToggleBookmark(question.id)}
+                      searchQuery={searchQuery}
                     />
                   ))
                 ) : (

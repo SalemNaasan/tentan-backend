@@ -13,7 +13,7 @@ const examTypes: { value: ExamType; label: string }[] = [
 ]
 
 // Available tenta-perioder (exam periods) for filtering
-const examPeriods = ["HT23", "VT24", "HT24", "VT25", "HT25"] as const
+const examPeriods = ["HT23", "VT24", "HT24", "VT25", "HT25", "VT26", "HT26"] as const
 // Only show the tema codes you actually use
 const subjects: SubjectArea[] = ["pu", "gen", "gnm", "vf", "erl", "cren", "ibi", "nspr"]
 

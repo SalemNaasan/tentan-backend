@@ -5,28 +5,41 @@ import type { Question } from "@/lib/types"
 
 export const dynamic = "force-dynamic"
 
+// Supabase/PostgREST returnerar max 1000 rader per query som standard.
+// Denna hjälpare sidindelar och hämtar ALLA rader oavsett antal.
+async function fetchAllRows<T = any>(table: string, columns: string): Promise<T[]> {
+  const pageSize = 1000
+  let from = 0
+  const rows: T[] = []
+
+  while (true) {
+    const { data, error } = await supabase
+      .from(table)
+      .select(columns)
+      .range(from, from + pageSize - 1)
+
+    if (error) throw error
+    if (!data || data.length === 0) break
+
+    rows.push(...(data as T[]))
+
+    if (data.length < pageSize) break
+    from += pageSize
+  }
+
+  return rows
+}
+
 export async function GET() {
   try {
-    // 1. Fetch custom questions
-    const { data: customQuestions, error: customError } = await supabase
-      .from('custom_questions')
-      .select('*')
+    // 1. Fetch custom questions (alla sidor)
+    const customQuestions = await fetchAllRows<any>('custom_questions', '*')
 
-    if (customError) throw customError
+    // 2. Fetch deleted question IDs (alla sidor)
+    const deletedIds = await fetchAllRows<{ id: string }>('deleted_question_ids', 'id')
 
-    // 2. Fetch deleted question IDs
-    const { data: deletedIds, error: deletedError } = await supabase
-      .from('deleted_question_ids')
-      .select('id')
-
-    if (deletedError) throw deletedError
-
-    // 2b. Fetch hidden question IDs
-    const { data: hiddenIds, error: hiddenError } = await supabase
-      .from('hidden_question_ids')
-      .select('id')
-
-    if (hiddenError) throw hiddenError
+    // 2b. Fetch hidden question IDs (alla sidor)
+    const hiddenIds = await fetchAllRows<{ id: string }>('hidden_question_ids', 'id')
 
     const deletedSet = new Set(deletedIds.map(d => d.id))
     const hiddenSet = new Set(hiddenIds.map(h => h.id))

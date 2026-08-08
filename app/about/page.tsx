@@ -132,10 +132,10 @@ export default function AboutPage() {
                     <div>
                       <p className="font-medium text-foreground">E-post</p>
                       <a
-                        href="mailto:admin@tentan.nu"
+                        href="mailto:salemshadi01@gmail.com"
                         className="text-sm text-accent hover:underline"
                       >
-                        admin@tentan.nu
+                        salemshadi01@gmail.com
                       </a>
                     </div>
                   </div>

@@ -1,8 +1,29 @@
 export type Semester = "T1" | "T2" | "T3" | "T4" | "T5" | "T6" | "T7" | "T8" | "T9" | "T10"
 
-export type ExamPeriod = "HT23" | "VT24" | "HT24" | "VT25" | "HT25" | "VT26" | "HT26"
+export type ExamPeriod =
+  | "VT20" | "HT20"
+  | "VT21" | "HT21"
+  | "VT22" | "HT22"
+  | "VT23" | "HT23"
+  | "VT24" | "HT24"
+  | "VT25" | "HT25"
+  | "VT26" | "HT26"
+  | "VT27" | "HT27"
+  | "VT28" | "HT28"
+  | "VT29" | "HT29"
 
-export const EXAM_PERIODS: ExamPeriod[] = ["HT23", "VT24", "HT24", "VT25", "HT25", "VT26", "HT26"]
+export const EXAM_PERIODS: ExamPeriod[] = [
+  "VT20", "HT20",
+  "VT21", "HT21",
+  "VT22", "HT22",
+  "VT23", "HT23",
+  "VT24", "HT24",
+  "VT25", "HT25",
+  "VT26", "HT26",
+  "VT27", "HT27",
+  "VT28", "HT28",
+  "VT29", "HT29",
+]
 
 export type ExamType = "regular" | "re-exam"
 

@@ -113,9 +113,19 @@ export async function POST(req: NextRequest) {
       case_name: q.caseName
     }))
 
-    const { error } = await supabase
+    let { error } = await supabase
       .from('custom_questions')
       .upsert(toUpsert)
+
+    // Fallback if case_name column does not exist in Supabase custom_questions table schema yet
+    if (error && (error.message?.includes('case_name') || error.message?.includes("'case_name'"))) {
+      console.warn("Supabase custom_questions table missing 'case_name' column. Retrying without case_name...")
+      const fallbackUpsert = toUpsert.map(({ case_name, ...rest }) => rest)
+      const fallbackResult = await supabase
+        .from('custom_questions')
+        .upsert(fallbackUpsert)
+      error = fallbackResult.error
+    }
 
     if (error) throw error
 

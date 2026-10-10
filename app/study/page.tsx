@@ -129,6 +129,19 @@ export default function StudyPage() {
     })
   }, [questions, selectedSemesters, selectedExamTypes, selectedSubjects, selectedPeriods, isOnlyBookmarked, bookmarkedIds, selectedInteractions, sortBy, searchQuery])
 
+  // Compute which options actually have questions given the current semester selection
+  const availableOptions = useMemo(() => {
+    const base = selectedSemesters.length > 0
+      ? questions.filter(q => !q.isHidden && selectedSemesters.includes(q.semester))
+      : questions.filter(q => !q.isHidden)
+    return {
+      examTypes: new Set(base.map(q => q.examType)),
+      periods:   new Set(base.map(q => q.examPeriod)),
+      subjects:  new Set(base.map(q => q.subjectArea)),
+      interactions: new Set(base.map(q => q.interaction)),
+    }
+  }, [questions, selectedSemesters])
+
   const totalPages = Math.ceil(filteredQuestions.length / PAGE_SIZE)
 
   const paginatedQuestions = useMemo(() => {
@@ -395,6 +408,7 @@ export default function StudyPage() {
       onShowOnlyBookmarkedChange={setIsOnlyBookmarked}
       selectedInteractions={selectedInteractions}
       setSelectedInteractions={setSelectedInteractions}
+      availableOptions={availableOptions}
     />
   )
 

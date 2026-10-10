@@ -45,6 +45,13 @@ const interactionTypes: { value: InteractionType; label: string }[] = [
   { value: "show_answer", label: "Skrivfrågor" },
 ]
 
+interface AvailableOptions {
+  examTypes: Set<string>
+  periods: Set<string>
+  subjects: Set<string>
+  interactions: Set<string>
+}
+
 interface FilterSidebarProps {
   selectedSemesters: Semester[]
   setSelectedSemesters: (semesters: Semester[]) => void
@@ -58,6 +65,7 @@ interface FilterSidebarProps {
   onShowOnlyBookmarkedChange: (checked: boolean) => void
   selectedInteractions: InteractionType[]
   setSelectedInteractions: (types: InteractionType[]) => void
+  availableOptions?: AvailableOptions
 }
 
 export function FilterSidebar({
@@ -73,7 +81,16 @@ export function FilterSidebar({
   onShowOnlyBookmarkedChange,
   selectedInteractions,
   setSelectedInteractions,
+  availableOptions,
 }: FilterSidebarProps) {
+  // If no availableOptions provided (e.g. no semester selected), everything is available
+  const hasOptions = !!availableOptions
+
+  const isTypeAvailable    = (v: string) => !hasOptions || availableOptions!.examTypes.has(v)
+  const isPeriodAvailable  = (v: string) => !hasOptions || availableOptions!.periods.has(v)
+  const isSubjectAvailable = (v: string) => !hasOptions || availableOptions!.subjects.has(v)
+  const isInteractionAvailable = (v: string) => !hasOptions || availableOptions!.interactions.has(v)
+
   const handleSemesterChange = (semester: Semester, checked: boolean) => {
     if (checked) {
       setSelectedSemesters([...selectedSemesters, semester])
@@ -129,6 +146,7 @@ export function FilterSidebar({
         </label>
       </div>
 
+      {/* Termin – always fully active (it's the "controller") */}
       <div>
         <h3 className="mb-3 text-sm font-semibold text-foreground uppercase tracking-wide">
           Termin
@@ -154,31 +172,43 @@ export function FilterSidebar({
         </div>
       </div>
 
+      {/* TentaTyp */}
       <div className="border-t border-border pt-6">
         <h3 className="mb-3 text-sm font-semibold text-foreground uppercase tracking-wide">
           TentaTyp
         </h3>
         <div className="space-y-2">
-          {examTypes.map((type) => (
-            <div key={type.value} className="flex items-center space-x-2">
-              <Checkbox
-                id={`type-${type.value}`}
-                checked={selectedExamTypes.includes(type.value)}
-                onCheckedChange={(checked) =>
-                  handleExamTypeChange(type.value, checked as boolean)
-                }
-              />
-              <Label
-                htmlFor={`type-${type.value}`}
-                className="text-sm font-normal cursor-pointer"
+          {examTypes.map((type) => {
+            const available = isTypeAvailable(type.value)
+            return (
+              <div
+                key={type.value}
+                className={cn(
+                  "flex items-center space-x-2 transition-opacity",
+                  !available && "opacity-35 pointer-events-none"
+                )}
               >
-                {type.label}
-              </Label>
-            </div>
-          ))}
+                <Checkbox
+                  id={`type-${type.value}`}
+                  checked={selectedExamTypes.includes(type.value)}
+                  onCheckedChange={(checked) =>
+                    handleExamTypeChange(type.value, checked as boolean)
+                  }
+                  disabled={!available}
+                />
+                <Label
+                  htmlFor={`type-${type.value}`}
+                  className="text-sm font-normal cursor-pointer"
+                >
+                  {type.label}
+                </Label>
+              </div>
+            )
+          })}
         </div>
       </div>
 
+      {/* Tenta-period */}
       <div className="border-t border-border pt-6">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-sm font-semibold text-foreground uppercase tracking-wide">
@@ -200,15 +230,19 @@ export function FilterSidebar({
               {(["VT","HT"] as const).map((half) => {
                 const period = `${half}${year}`
                 const active = selectedPeriods.includes(period)
+                const available = isPeriodAvailable(period)
                 return (
                   <button
                     key={period}
-                    onClick={() => handlePeriodChange(period, !active)}
-                    className={`px-2.5 py-0.5 rounded-full text-xs font-medium transition-all border ${
+                    onClick={() => available && handlePeriodChange(period, !active)}
+                    className={cn(
+                      "px-2.5 py-0.5 rounded-full text-xs font-medium transition-all border",
                       active
                         ? "bg-primary text-primary-foreground border-primary"
-                        : "bg-transparent text-muted-foreground border-border hover:border-foreground hover:text-foreground"
-                    }`}
+                        : available
+                          ? "bg-transparent text-muted-foreground border-border hover:border-foreground hover:text-foreground"
+                          : "bg-transparent text-muted-foreground/30 border-border/30 cursor-not-allowed"
+                    )}
                   >
                     {half}
                   </button>
@@ -219,54 +253,75 @@ export function FilterSidebar({
         </div>
       </div>
 
-
+      {/* Ämnesområde */}
       <div className="border-t border-border pt-6">
         <h3 className="mb-3 text-sm font-semibold text-foreground uppercase tracking-wide">
           Ämnesområde
         </h3>
         <div className="space-y-2 max-h-64 overflow-y-auto pr-2">
-          {subjects.map((subject) => (
-            <div key={subject} className="flex items-center space-x-2">
-              <Checkbox
-                id={`subject-${subject}`}
-                checked={selectedSubjects.includes(subject)}
-                onCheckedChange={(checked) =>
-                  handleSubjectChange(subject, checked as boolean)
-                }
-              />
-              <Label
-                htmlFor={`subject-${subject}`}
-                className="text-sm font-normal cursor-pointer"
+          {subjects.map((subject) => {
+            const available = isSubjectAvailable(subject)
+            return (
+              <div
+                key={subject}
+                className={cn(
+                  "flex items-center space-x-2 transition-opacity",
+                  !available && "opacity-35 pointer-events-none"
+                )}
               >
-                {subjectLabels[subject]}
-              </Label>
-            </div>
-          ))}
+                <Checkbox
+                  id={`subject-${subject}`}
+                  checked={selectedSubjects.includes(subject)}
+                  onCheckedChange={(checked) =>
+                    handleSubjectChange(subject, checked as boolean)
+                  }
+                  disabled={!available}
+                />
+                <Label
+                  htmlFor={`subject-${subject}`}
+                  className="text-sm font-normal cursor-pointer"
+                >
+                  {subjectLabels[subject]}
+                </Label>
+              </div>
+            )
+          })}
         </div>
       </div>
 
+      {/* Frågetyp */}
       <div className="border-t border-border pt-6">
         <h3 className="mb-3 text-sm font-semibold text-foreground uppercase tracking-wide">
           Frågetyp
         </h3>
         <div className="space-y-2">
-          {interactionTypes.map((type) => (
-            <div key={type.value} className="flex items-center space-x-2">
-              <Checkbox
-                id={`interaction-${type.value}`}
-                checked={selectedInteractions.includes(type.value)}
-                onCheckedChange={(checked) =>
-                  handleInteractionChange(type.value, checked as boolean)
-                }
-              />
-              <Label
-                htmlFor={`interaction-${type.value}`}
-                className="text-sm font-normal cursor-pointer"
+          {interactionTypes.map((type) => {
+            const available = isInteractionAvailable(type.value)
+            return (
+              <div
+                key={type.value}
+                className={cn(
+                  "flex items-center space-x-2 transition-opacity",
+                  !available && "opacity-35 pointer-events-none"
+                )}
               >
-                {type.label}
-              </Label>
-            </div>
-          ))}
+                <Checkbox
+                  id={`interaction-${type.value}`}
+                  checked={selectedInteractions.includes(type.value)}
+                  onCheckedChange={(checked) =>
+                    handleInteractionChange(type.value, checked as boolean)
+                  }
+                  disabled={!available}
+                />
+                <Label
+                  htmlFor={`interaction-${type.value}`}
+                  className="text-sm font-normal cursor-pointer"
+                >
+                  {type.label}
+                </Label>
+              </div>
+            )
+          })}
         </div>
       </div>
     </div>

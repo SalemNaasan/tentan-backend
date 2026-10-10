@@ -180,29 +180,45 @@ export function FilterSidebar({
       </div>
 
       <div className="border-t border-border pt-6">
-        <h3 className="mb-3 text-sm font-semibold text-foreground uppercase tracking-wide">
-          Tenta-period
-        </h3>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-semibold text-foreground uppercase tracking-wide">
+            Tenta-period
+          </h3>
+          {selectedPeriods.length > 0 && (
+            <button
+              onClick={() => setSelectedPeriods([])}
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Rensa
+            </button>
+          )}
+        </div>
         <div className="space-y-2">
-          {examPeriods.map((period) => (
-            <div key={period} className="flex items-center space-x-2">
-              <Checkbox
-                id={`period-${period}`}
-                checked={selectedPeriods.includes(period)}
-                onCheckedChange={(checked) =>
-                  handlePeriodChange(period, checked as boolean)
-                }
-              />
-              <Label
-                htmlFor={`period-${period}`}
-                className="text-sm font-normal cursor-pointer"
-              >
-                {period}
-              </Label>
+          {["20","21","22","23","24","25","26","27","28","29"].map((year) => (
+            <div key={year} className="flex items-center gap-1.5">
+              <span className="text-xs text-muted-foreground w-6 shrink-0">{year}</span>
+              {(["VT","HT"] as const).map((half) => {
+                const period = `${half}${year}`
+                const active = selectedPeriods.includes(period)
+                return (
+                  <button
+                    key={period}
+                    onClick={() => handlePeriodChange(period, !active)}
+                    className={`px-2.5 py-0.5 rounded-full text-xs font-medium transition-all border ${
+                      active
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-transparent text-muted-foreground border-border hover:border-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {half}
+                  </button>
+                )
+              })}
             </div>
           ))}
         </div>
       </div>
+
 
       <div className="border-t border-border pt-6">
         <h3 className="mb-3 text-sm font-semibold text-foreground uppercase tracking-wide">

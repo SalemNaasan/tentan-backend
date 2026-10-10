@@ -210,10 +210,19 @@ export function QuestionCard({
                   {question.examType === "regular" ? "Ordinarie" : "Omtenta"}
                 </Badge>
                 <Badge variant="secondary">{question.subjectArea}</Badge>
+                {question.caseName && (
+                  <Badge variant="outline" className="font-semibold bg-accent/10 border-accent/30 text-accent">
+                    {question.caseName.toLowerCase().startsWith('fall') ? question.caseName : `Fall ${question.caseName.toUpperCase()}`}
+                  </Badge>
+                )}
                 <span className="text-xs text-muted-foreground">{question.examPeriod}</span>
               </div>
               <p className="text-sm text-muted-foreground">
-                Fråga {question.questionNumber}
+                {question.caseName ? (
+                  <>Fråga <span className="font-bold text-foreground">{question.caseName.replace(/^fall\s*/i, '').trim().toUpperCase()}:{question.questionNumber}</span></>
+                ) : (
+                  <>Fråga {question.questionNumber}</>
+                )}
                 {question.points !== undefined && (
                   <span className="ml-2 px-1.5 py-0.5 rounded-md bg-accent/10 text-accent font-semibold text-[10px] uppercase tracking-wider border border-accent/20">
                     {question.points} {question.points === 1 ? 'poäng' : 'poäng'}

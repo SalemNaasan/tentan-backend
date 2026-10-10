@@ -65,6 +65,7 @@ export async function GET(req: NextRequest) {
                     answer: q.answer || q.correct_answer || "",
                     points: q.points,
                     imageUrl: q.image_url,
+                    caseName: q.case_name || q.caseName,
                     isHidden: q.is_hidden
                 }
 

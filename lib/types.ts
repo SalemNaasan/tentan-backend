@@ -63,6 +63,7 @@ export interface Question {
   isHidden?: boolean
   points?: number
   imageUrl?: string
+  caseName?: string
 }
 
 export interface Exam {

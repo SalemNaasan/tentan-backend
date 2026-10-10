@@ -44,6 +44,7 @@ export default function StudyPage() {
   const [bookmarkedIds, setBookmarkedIds] = useState<string[]>([])
   const [isOnlyBookmarked, setIsOnlyBookmarked] = useState(false)
   const [selectedInteractions, setSelectedInteractions] = useState<InteractionType[]>([])
+  const [selectedCases, setSelectedCases] = useState<string[]>([])
   const [sortBy, setSortBy] = useState<"number-asc" | "number-desc" | "points-asc" | "points-desc">("number-asc")
   const [searchQuery, setSearchQuery] = useState("")
 
@@ -73,7 +74,7 @@ export default function StudyPage() {
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1)
-  }, [selectedSemesters, selectedExamTypes, selectedSubjects, selectedPeriods, isOnlyBookmarked, selectedInteractions, searchQuery])
+  }, [selectedSemesters, selectedExamTypes, selectedSubjects, selectedPeriods, isOnlyBookmarked, selectedInteractions, selectedCases, searchQuery])
 
   const filteredQuestions = useMemo(() => {
 
@@ -99,25 +100,37 @@ export default function StudyPage() {
       if (selectedInteractions.length > 0 && !selectedInteractions.includes(q.interaction)) {
         return false
       }
+      if (selectedCases.length > 0) {
+        if (!q.caseName) return false
+        const normalizedCase = q.caseName.toLowerCase().startsWith('fall') ? q.caseName : `Fall ${q.caseName.toUpperCase()}`
+        const matchCase = selectedCases.some(c => c.toLowerCase() === normalizedCase.toLowerCase() || c.toLowerCase().endsWith(q.caseName!.toLowerCase()))
+        if (!matchCase) return false
+      }
       if (searchQuery.trim() !== "") {
         const query = searchQuery.toLowerCase().trim()
         const matchesText = q.questionText.toLowerCase().includes(query)
         const matchesNumber = q.questionNumber.toString().includes(query)
         const matchesSubject = q.subjectArea.toLowerCase().includes(query)
         const matchesAnswer = q.answer?.toLowerCase().includes(query) || false
+        const matchesCase = q.caseName?.toLowerCase().includes(query) || false
         const matchesOptions = q.options?.some(opt => opt.toLowerCase().includes(query)) || false
         const matchesCorrectAnswer = typeof q.correctAnswer === "string"
           ? q.correctAnswer.toLowerCase().includes(query)
           : Array.isArray(q.correctAnswer)
             ? q.correctAnswer.some(ca => ca.toLowerCase().includes(query))
             : false
-        if (!matchesText && !matchesNumber && !matchesSubject && !matchesAnswer && !matchesOptions && !matchesCorrectAnswer) {
+        if (!matchesText && !matchesNumber && !matchesSubject && !matchesAnswer && !matchesCase && !matchesOptions && !matchesCorrectAnswer) {
           return false
         }
       }
       return true
     }).sort((a, b) => {
       if (sortBy === "number-asc" || sortBy === "number-desc") {
+        const caseA = a.caseName || ""
+        const caseB = b.caseName || ""
+        if (caseA !== caseB) {
+          return sortBy === "number-asc" ? caseA.localeCompare(caseB) : caseB.localeCompare(caseA)
+        }
         const numA = Number(a.questionNumber) || 0
         const numB = Number(b.questionNumber) || 0
         return sortBy === "number-asc" ? numA - numB : numB - numA
@@ -127,7 +140,7 @@ export default function StudyPage() {
         return sortBy === "points-asc" ? pA - pB : pB - pA
       }
     })
-  }, [questions, selectedSemesters, selectedExamTypes, selectedSubjects, selectedPeriods, isOnlyBookmarked, bookmarkedIds, selectedInteractions, sortBy, searchQuery])
+  }, [questions, selectedSemesters, selectedExamTypes, selectedSubjects, selectedPeriods, isOnlyBookmarked, bookmarkedIds, selectedInteractions, selectedCases, sortBy, searchQuery])
 
   // Compute which options actually have questions given the current semester selection
   const availableOptions = useMemo(() => {
@@ -139,6 +152,7 @@ export default function StudyPage() {
       periods:   new Set(base.map(q => q.examPeriod)),
       subjects:  new Set(base.map(q => q.subjectArea)),
       interactions: new Set(base.map(q => q.interaction)),
+      cases: new Set(base.map(q => q.caseName ? (q.caseName.toLowerCase().startsWith('fall') ? q.caseName : `Fall ${q.caseName.toUpperCase()}`) : null).filter(Boolean) as string[]),
     }
   }, [questions, selectedSemesters])
 
@@ -408,6 +422,8 @@ export default function StudyPage() {
       onShowOnlyBookmarkedChange={setIsOnlyBookmarked}
       selectedInteractions={selectedInteractions}
       setSelectedInteractions={setSelectedInteractions}
+      selectedCases={selectedCases}
+      setSelectedCases={setSelectedCases}
       availableOptions={availableOptions}
     />
   )

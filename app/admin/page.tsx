@@ -46,6 +46,7 @@ interface ExtractedQuestion {
   points?: number
   status: "pending" | "approved" | "rejected" | "editing"
   imageUrl?: string
+  caseName?: string
 }
 
 interface UploadState {
@@ -329,17 +330,30 @@ export default function AdminPage() {
         const row = rows[i] as any[]
         if (!row) continue
 
-        // Manually map row array to a string-based object as requested
-        // columns: question_id, theme, interaction, question_text, options, correct_answer
+        let rawId = row[0] != null ? String(row[0]).trim() : ""
+        let rawCase = row[8] != null ? String(row[8]).trim() : (row[7] != null && !String(row[7]).includes("http") && !String(row[7]).includes(".") ? String(row[7]).trim() : "")
+        let caseName: string | undefined = undefined
+        let qNumStr = rawId
+
+        if (!rawCase && rawId) {
+          const match = rawId.match(/^(?:fall\s*)?([a-z0-9]+)[\:\-\s]+(?:fråga\s*)?(\d+)$/i)
+          if (match) {
+            caseName = `Fall ${match[1].toUpperCase()}`
+            qNumStr = match[2]
+          }
+        } else if (rawCase) {
+          caseName = rawCase.toLowerCase().startsWith("fall") ? rawCase : `Fall ${rawCase.toUpperCase()}`
+        }
+
         const excelRow = {
-          qId: row[0] != null ? String(row[0]) : "",
+          qId: qNumStr,
           theme: row[1] != null ? String(row[1]) : "",
           interaction: row[2] != null ? String(row[2]) : "show_answer",
           qText: row[3] != null ? String(row[3]) : "",
           optionsStr: row[4] != null ? String(row[4]) : "",
           correctAnsStr: row[5] != null ? String(row[5]) : "",
           points: row[6] != null ? Number(row[6]) : undefined,
-          imageUrl: row[7] != null ? String(row[7]) : undefined,
+          imageUrl: row[7] != null && (String(row[7]).includes("http") || String(row[7]).includes(".")) ? String(row[7]) : undefined,
         }
 
         if (excelRow.qText.trim() === "") continue
@@ -366,6 +380,7 @@ export default function AdminPage() {
         extractedQs.push({
           id: `eq${i + 1}`,
           questionNumber: excelRow.qId || `${i + 1}`,
+          caseName,
           theme: excelRow.theme,
           interaction,
           questionText: excelRow.qText.trim(),
@@ -463,6 +478,7 @@ export default function AdminPage() {
       answer: Array.isArray(q.correctAnswer) ? q.correctAnswer.join(", ") : (q.correctAnswer as string),
       points: q.points,
       imageUrl: q.imageUrl,
+      caseName: q.caseName,
     }))
 
     try {
@@ -1032,7 +1048,8 @@ export default function AdminPage() {
                           <th className="px-3 py-2 text-left font-medium border-b border-r border-border">question_text</th>
                           <th className="px-3 py-2 text-left font-medium border-b border-r border-border">options</th>
                           <th className="px-3 py-2 text-left font-medium border-b border-r border-border">correct_answer</th>
-                          <th className="px-3 py-2 text-left font-medium border-b border-border">points</th>
+                          <th className="px-3 py-2 text-left font-medium border-b border-r border-border">points</th>
+                          <th className="px-3 py-2 text-left font-medium border-b border-border">case_name (t.ex. Fall B)</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1124,8 +1141,13 @@ export default function AdminPage() {
                         <div className="flex-1 space-y-3">
                           <div className="flex items-center gap-2">
                             <Badge variant="outline" className="text-xs">
-                              Fråga {question.questionNumber}
+                              {question.caseName ? `Fråga ${question.caseName.replace(/^fall\s*/i, '').trim().toUpperCase()}:${question.questionNumber}` : `Fråga ${question.questionNumber}`}
                             </Badge>
+                            {question.caseName && (
+                              <Badge variant="outline" className="text-xs bg-primary/10 text-primary border-primary/20">
+                                {question.caseName}
+                              </Badge>
+                            )}
                             <Badge variant="secondary" className="text-xs">
                               {question.theme}
                             </Badge>
@@ -1327,6 +1349,11 @@ export default function AdminPage() {
                                   <Badge variant="outline" className="text-xs">
                                     {question.semester} · {question.examType === "regular" ? "Ordinarie" : "Omtenta"}
                                   </Badge>
+                                  {question.caseName && (
+                                    <Badge variant="outline" className="text-xs bg-accent/10 border-accent/30 text-accent font-semibold">
+                                      {question.caseName}
+                                    </Badge>
+                                  )}
                                   <Badge variant="secondary" className="text-xs">
                                     {subjectLabels[question.subjectArea]}
                                   </Badge>
@@ -1901,6 +1928,19 @@ export default function AdminPage() {
                   />
                 </div>
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="avail-edit-casename">Fall (t.ex. Fall A, Fall B)</Label>
+                <Input
+                  id="avail-edit-casename"
+                  placeholder="t.ex. Fall B"
+                  value={editingAvailableQuestion.caseName || ""}
+                  onChange={(e) =>
+                    setEditingAvailableQuestion((prev) =>
+                      prev ? { ...prev, caseName: e.target.value } : null
+                    )
+                  }
+                />
+              </div>
               <div className="flex justify-end gap-2 pt-4">
                 <Button variant="outline" onClick={() => setEditingAvailableQuestion(null)}>
                   Avbryt
@@ -2012,6 +2052,19 @@ export default function AdminPage() {
                     }
                   />
                 </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-casename">Fall (t.ex. Fall A, Fall B)</Label>
+                <Input
+                  id="edit-casename"
+                  placeholder="t.ex. Fall B"
+                  value={editingQuestion.caseName || ""}
+                  onChange={(e) =>
+                    setEditingQuestion((prev) =>
+                      prev ? { ...prev, caseName: e.target.value } : null
+                    )
+                  }
+                />
               </div>
               <ImageUpload
                 value={editingQuestion.imageUrl}
@@ -2216,6 +2269,15 @@ export default function AdminPage() {
                     onChange={(e) => setNewQuestion(prev => ({ ...prev, examDate: e.target.value }))}
                   />
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Fall (t.ex. Fall A, Fall B, valfritt)</Label>
+                <Input
+                  placeholder="t.ex. Fall B"
+                  value={newQuestion.caseName || ""}
+                  onChange={(e) => setNewQuestion(prev => ({ ...prev, caseName: e.target.value }))}
+                />
               </div>
 
               <ImageUpload

@@ -45,11 +45,14 @@ const interactionTypes: { value: InteractionType; label: string }[] = [
   { value: "show_answer", label: "Skrivfrågor" },
 ]
 
+const defaultCases = ["Fall A", "Fall B", "Fall C", "Fall D", "Fall E", "Fall F"]
+
 interface AvailableOptions {
   examTypes: Set<string>
   periods: Set<string>
   subjects: Set<string>
   interactions: Set<string>
+  cases: Set<string>
 }
 
 interface FilterSidebarProps {
@@ -65,6 +68,8 @@ interface FilterSidebarProps {
   onShowOnlyBookmarkedChange: (checked: boolean) => void
   selectedInteractions: InteractionType[]
   setSelectedInteractions: (types: InteractionType[]) => void
+  selectedCases?: string[]
+  setSelectedCases?: (cases: string[]) => void
   availableOptions?: AvailableOptions
 }
 
@@ -81,6 +86,8 @@ export function FilterSidebar({
   onShowOnlyBookmarkedChange,
   selectedInteractions,
   setSelectedInteractions,
+  selectedCases = [],
+  setSelectedCases,
   availableOptions,
 }: FilterSidebarProps) {
   // If no availableOptions provided (e.g. no semester selected), everything is available
@@ -90,6 +97,16 @@ export function FilterSidebar({
   const isPeriodAvailable  = (v: string) => !hasOptions || availableOptions!.periods.has(v)
   const isSubjectAvailable = (v: string) => !hasOptions || availableOptions!.subjects.has(v)
   const isInteractionAvailable = (v: string) => !hasOptions || availableOptions!.interactions.has(v)
+  const isCaseAvailable = (v: string) => !hasOptions || (availableOptions!.cases && availableOptions!.cases.size > 0 ? (availableOptions!.cases.has(v) || availableOptions!.cases.has(v.replace(/^fall\s*/i, '').trim())) : true)
+
+  const handleCaseChange = (caseName: string, checked: boolean) => {
+    if (!setSelectedCases) return
+    if (checked) {
+      setSelectedCases([...selectedCases, caseName])
+    } else {
+      setSelectedCases(selectedCases.filter((c) => c !== caseName))
+    }
+  }
 
   const handleSemesterChange = (semester: Semester, checked: boolean) => {
     if (checked) {
@@ -324,6 +341,54 @@ export function FilterSidebar({
           })}
         </div>
       </div>
+
+      {/* Fall (Case) - Speciellt relevant för T4 & T5 */}
+      {setSelectedCases && (
+        <div className="border-t border-border pt-6">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-foreground uppercase tracking-wide">
+              Fall (T4-T5)
+            </h3>
+            {selectedCases.length > 0 && (
+              <button
+                onClick={() => setSelectedCases([])}
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Rensa
+              </button>
+            )}
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            {defaultCases.map((cName) => {
+              const available = isCaseAvailable(cName)
+              return (
+                <div
+                  key={cName}
+                  className={cn(
+                    "flex items-center space-x-2 transition-opacity",
+                    !available && "opacity-35 pointer-events-none"
+                  )}
+                >
+                  <Checkbox
+                    id={`case-${cName}`}
+                    checked={selectedCases.includes(cName)}
+                    onCheckedChange={(checked) =>
+                      handleCaseChange(cName, checked as boolean)
+                    }
+                    disabled={!available}
+                  />
+                  <Label
+                    htmlFor={`case-${cName}`}
+                    className="text-sm font-normal cursor-pointer"
+                  >
+                    {cName}
+                  </Label>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

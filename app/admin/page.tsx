@@ -45,6 +45,7 @@ interface ExtractedQuestion {
   correctAnswer: string | string[]
   points?: number
   status: "pending" | "approved" | "rejected" | "editing"
+  imageUrl?: string
 }
 
 interface UploadState {
@@ -338,6 +339,7 @@ export default function AdminPage() {
           optionsStr: row[4] != null ? String(row[4]) : "",
           correctAnsStr: row[5] != null ? String(row[5]) : "",
           points: row[6] != null ? Number(row[6]) : undefined,
+          imageUrl: row[7] != null ? String(row[7]) : undefined,
         }
 
         if (excelRow.qText.trim() === "") continue
@@ -370,6 +372,7 @@ export default function AdminPage() {
           options,
           correctAnswer,
           points: excelRow.points,
+          imageUrl: excelRow.imageUrl,
           status: "pending" as const,
         })
 
@@ -459,6 +462,7 @@ export default function AdminPage() {
       correctAnswer: q.correctAnswer,
       answer: Array.isArray(q.correctAnswer) ? q.correctAnswer.join(", ") : (q.correctAnswer as string),
       points: q.points,
+      imageUrl: q.imageUrl,
     }))
 
     try {
@@ -1155,6 +1159,17 @@ export default function AdminPage() {
                                 {question.options && ` (Alternativ: ${question.options.join(", ")})`}
                               </p>
                             </div>
+                          </div>
+
+                          <div className="pt-2">
+                            <ImageUpload
+                              value={question.imageUrl}
+                              onChange={(url: string) => {
+                                setExtractedQuestions(prev =>
+                                  prev.map(q => q.id === question.id ? { ...q, imageUrl: url } : q)
+                                )
+                              }}
+                            />
                           </div>
                         </div>
 
@@ -1998,6 +2013,12 @@ export default function AdminPage() {
                   />
                 </div>
               </div>
+              <ImageUpload
+                value={editingQuestion.imageUrl}
+                onChange={(url: string) =>
+                  setEditingQuestion((prev) => (prev ? { ...prev, imageUrl: url } : null))
+                }
+              />
               <div className="flex justify-end gap-2 pt-4">
                 <Button
                   variant="outline"
@@ -2196,6 +2217,11 @@ export default function AdminPage() {
                   />
                 </div>
               </div>
+
+              <ImageUpload
+                value={newQuestion.imageUrl}
+                onChange={(url: string) => setNewQuestion(prev => ({ ...prev, imageUrl: url }))}
+              />
 
               <div className="space-y-2">
                 <Label>Förklaring / Utförligt svar</Label>

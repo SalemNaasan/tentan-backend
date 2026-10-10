@@ -32,6 +32,8 @@ import { ImageUpload } from "@/components/admin/image-upload"
 
 
 const ADMIN_PASSWORD = "salem"
+const GUEST_PASSWORD = "jad"
+const LIMITED_SEMESTERS: Semester[] = ["T4", "T5"]
 
 interface ExtractedQuestion {
   id: string
@@ -83,7 +85,7 @@ function mapSubjectToArea(tema: string): SubjectArea {
 }
 
 export default function AdminPage() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [adminRole, setAdminRole] = useState<"super" | "limited" | null>(null)
   const [passwordInput, setPasswordInput] = useState("")
   const [passwordError, setPasswordError] = useState(false)
 
@@ -676,6 +678,8 @@ export default function AdminPage() {
   }
 
   const filteredManageQuestions = availableQuestions.filter(q => {
+    // Limited admin only sees T4 and T5
+    if (adminRole === "limited" && !LIMITED_SEMESTERS.includes(q.semester)) return false
     if (manageSemester !== "all" && q.semester !== manageSemester) return false
     if (manageSubject !== "all" && q.subjectArea !== manageSubject) return false
     if (manageVisibility === "visible" && q.isHidden) return false
@@ -727,14 +731,18 @@ export default function AdminPage() {
   const handlePasswordSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (passwordInput === ADMIN_PASSWORD) {
-      setIsAuthenticated(true)
+      setAdminRole("super")
+      setPasswordError(false)
+    } else if (passwordInput === GUEST_PASSWORD) {
+      setAdminRole("limited")
+      setSelectedSemester("T4")
       setPasswordError(false)
     } else {
       setPasswordError(true)
     }
   }
 
-  if (!isAuthenticated) {
+  if (!adminRole) {
     return (
       <div className="flex min-h-screen flex-col">
         <Header />
@@ -816,26 +824,32 @@ export default function AdminPage() {
                 <List className="h-4 w-4" />
                 Befintliga frågor
                 <Badge variant="secondary" className="ml-1">
-                  {availableQuestions.length}
+                  {filteredManageQuestions.length}
                 </Badge>
               </TabsTrigger>
-              <TabsTrigger value="feedback" className="gap-2">
-                <MessageSquare className="h-4 w-4" />
-                Feedback
-                {feedbackList.filter((f) => f.status === "new").length > 0 && (
-                  <Badge variant="destructive" className="ml-1">
-                    {feedbackList.filter((f) => f.status === "new").length}
-                  </Badge>
-                )}
-              </TabsTrigger>
-              <TabsTrigger value="news" className="gap-2">
-                <Bell className="h-4 w-4" />
-                Nyheter
-              </TabsTrigger>
-              <TabsTrigger value="cases" className="gap-2">
-                <Briefcase className="h-4 w-4" />
-                PPL-fall
-              </TabsTrigger>
+              {adminRole === "super" && (
+                <TabsTrigger value="feedback" className="gap-2">
+                  <MessageSquare className="h-4 w-4" />
+                  Feedback
+                  {feedbackList.filter((f) => f.status === "new").length > 0 && (
+                    <Badge variant="destructive" className="ml-1">
+                      {feedbackList.filter((f) => f.status === "new").length}
+                    </Badge>
+                  )}
+                </TabsTrigger>
+              )}
+              {adminRole === "super" && (
+                <TabsTrigger value="news" className="gap-2">
+                  <Bell className="h-4 w-4" />
+                  Nyheter
+                </TabsTrigger>
+              )}
+              {adminRole === "super" && (
+                <TabsTrigger value="cases" className="gap-2">
+                  <Briefcase className="h-4 w-4" />
+                  PPL-fall
+                </TabsTrigger>
+              )}
             </TabsList>
 
             {/* Upload Tab */}
@@ -860,7 +874,7 @@ export default function AdminPage() {
                           <SelectValue placeholder="Välj termin" />
                         </SelectTrigger>
                         <SelectContent>
-                          {["T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8", "T9", "T10"].map((s) => (
+                          {(adminRole === "limited" ? LIMITED_SEMESTERS : ["T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8", "T9", "T10"]).map((s) => (
                             <SelectItem key={s} value={s}>
                               {s}
                             </SelectItem>
@@ -1203,13 +1217,17 @@ export default function AdminPage() {
                         className="pl-9"
                       />
                     </div>
-                    <Select value={manageSemester} onValueChange={(v) => setManageSemester(v as any)}>
+                    <Select
+                      value={manageSemester}
+                      onValueChange={(v) => setManageSemester(v as any)}
+                      disabled={adminRole === "limited"}
+                    >
                       <SelectTrigger>
-                        <SelectValue placeholder="Alla terminer" />
+                        <SelectValue placeholder={adminRole === "limited" ? "T4 & T5" : "Alla terminer"} />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">Alla terminer</SelectItem>
-                        {["T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8", "T9", "T10"].map(s => (
+                        {adminRole === "super" && <SelectItem value="all">Alla terminer</SelectItem>}
+                        {(adminRole === "limited" ? LIMITED_SEMESTERS : ["T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8", "T9", "T10"]).map(s => (
                           <SelectItem key={s} value={s}>{s}</SelectItem>
                         ))}
                       </SelectContent>

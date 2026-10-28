@@ -177,33 +177,59 @@ export async function PATCH(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
+    let ids: string[] = []
     const { searchParams } = new URL(req.url)
-    const id = searchParams.get('id')
+    const singleId = searchParams.get('id')
+    const idsParam = searchParams.get('ids')
 
-    if (!id) {
+    if (idsParam) {
+      ids = idsParam.split(',').map(s => s.trim()).filter(Boolean)
+    } else if (singleId) {
+      ids = [singleId]
+    } else {
+      try {
+        const body = await req.json()
+        if (body && Array.isArray(body.ids)) {
+          ids = body.ids
+        } else if (body && body.id) {
+          ids = [body.id]
+        }
+      } catch (e) {
+        // Not a JSON body
+      }
+    }
+
+    if (ids.length === 0) {
       return NextResponse.json({ error: "Missing ID" }, { status: 400 })
     }
 
-    if (id.startsWith('custom-')) {
-      // Delete from custom questions
-      const { error } = await supabase
-        .from('custom_questions')
-        .delete()
-        .eq('id', id)
+    const customIds = ids.filter(i => i.startsWith('custom-'))
+    const mockIds = ids.filter(i => !i.startsWith('custom-'))
 
-      if (error) throw error
-    } else {
-      // Mark mock question as deleted
+    if (customIds.length > 0) {
+      const CHUNK_SIZE = 500
+      for (let i = 0; i < customIds.length; i += CHUNK_SIZE) {
+        const chunk = customIds.slice(i, i + CHUNK_SIZE)
+        const { error } = await supabase
+          .from('custom_questions')
+          .delete()
+          .in('id', chunk)
+
+        if (error) throw error
+      }
+    }
+
+    if (mockIds.length > 0) {
       const { error } = await supabase
         .from('deleted_question_ids')
-        .insert({ id })
+        .upsert(mockIds.map(i => ({ id: i })), { onConflict: 'id', ignoreDuplicates: true })
 
       if (error) throw error
     }
 
-    return NextResponse.json({ success: true })
-  } catch (error) {
+    return NextResponse.json({ success: true, count: ids.length })
+  } catch (error: any) {
     console.error("API Error (DELETE):", error)
-    return NextResponse.json({ error: "Failed to delete question" }, { status: 500 })
+    return NextResponse.json({ error: error.message || "Failed to delete question" }, { status: 500 })
   }
 }

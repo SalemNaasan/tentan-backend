@@ -4,19 +4,19 @@ export const dynamic = "force-dynamic"
 
 
 import React from "react"
-import { useState, useCallback, useEffect } from "react"
+import { useState, useCallback, useEffect, useMemo } from "react"
 import * as XLSX from "xlsx"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
-import { Upload, FileText, Check, X, Edit2, Loader2, AlertCircle, Lock, Trash2, List, MessageSquare, Eye, EyeOff, Search, ArrowUpDown, Plus, PlusCircle, Image as ImageIcon, BookOpen, Bell, Briefcase } from "lucide-react"
+import { Upload, FileText, Check, X, Edit2, Loader2, AlertCircle, Lock, Trash2, List, MessageSquare, Eye, EyeOff, Search, ArrowUpDown, Plus, PlusCircle, Image as ImageIcon, BookOpen, Bell, Briefcase, Copy, AlertTriangle } from "lucide-react"
 import type { Semester, ExamType, SubjectArea, ExamPeriod, InteractionType, Question, QuestionFeedback, FeedbackStatus, PPLCase } from "@/lib/types"
 import { EXAM_PERIODS } from "@/lib/types"
 import { ImageUpload } from "@/components/admin/image-upload"
@@ -120,9 +120,14 @@ export default function AdminPage() {
   const [manageSearchQuery, setManageSearchQuery] = useState("")
   const [manageSemester, setManageSemester] = useState<Semester | "all">("all")
   const [manageSubject, setManageSubject] = useState<SubjectArea | "all">("all")
-  const [manageVisibility, setManageVisibility] = useState<"all" | "visible" | "hidden">("all")
+  const [manageVisibility, setManageVisibility] = useState<"all" | "visible" | "hidden" | "duplicates">("all")
   const [manageSortOrder, setManageSortOrder] = useState<"asc" | "desc">("desc")
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
+  const [isDuplicatesDialogOpen, setIsDuplicatesDialogOpen] = useState(false)
+  const [deletingDuplicates, setDeletingDuplicates] = useState(false)
+  const [isSavingAll, setIsSavingAll] = useState(false)
+  const [isCreatingQuestion, setIsCreatingQuestion] = useState(false)
+  const [isSavingEdit, setIsSavingEdit] = useState(false)
   const [newQuestion, setNewQuestion] = useState<Partial<Question>>({
     semester: "T1",
     examType: "regular",
@@ -456,12 +461,14 @@ export default function AdminPage() {
   }
 
   const handleSaveAll = async () => {
+    if (isSavingAll) return
     const approved = extractedQuestions.filter((q) => q.status === "approved")
 
     if (approved.length === 0) {
       return
     }
 
+    setIsSavingAll(true)
     // Map approved extracted questions to the shared Question type
     const newQuestions: Question[] = approved.map((q, index) => ({
       id: `custom-${Date.now()}-${index}`,
@@ -496,6 +503,8 @@ export default function AdminPage() {
     } catch (error: any) {
       console.error("Failed to save questions", error)
       alert(`Kunde inte spara frågorna till databasen: ${error.message}`)
+    } finally {
+      setIsSavingAll(false)
     }
   }
 
@@ -600,6 +609,9 @@ export default function AdminPage() {
       answer: finalAnswer
     }
 
+    if (isSavingEdit) return
+    setIsSavingEdit(true)
+
     try {
       const res = await fetch("/api/questions", {
         method: "POST",
@@ -615,14 +627,19 @@ export default function AdminPage() {
     } catch (error: any) {
       console.error("Failed to save edit", error)
       alert(`Kunde inte spara ändringarna: ${error.message}`)
+    } finally {
+      setIsSavingEdit(false)
     }
   }
 
   const handleCreateQuestion = async () => {
+    if (isCreatingQuestion) return
     if (!newQuestion.questionText) {
       alert("Vänligen fyll i frågetexten.")
       return
     }
+
+    setIsCreatingQuestion(true)
 
     let finalCorrectAnswer = newQuestion.correctAnswer || ""
     let finalAnswer = newQuestion.answer || ""
@@ -679,6 +696,8 @@ export default function AdminPage() {
     } catch (error: any) {
       console.error("Failed to create question", error)
       alert(`Kunde inte skapa frågan: ${error.message}`)
+    } finally {
+      setIsCreatingQuestion(false)
     }
   }
 
@@ -697,6 +716,130 @@ export default function AdminPage() {
     }
   }
 
+  interface DuplicateGroup {
+    key: string
+    semester: string
+    questionText: string
+    answer: string
+    original: Question
+    duplicates: Question[]
+    all: Question[]
+  }
+
+  const duplicateGroups = useMemo<DuplicateGroup[]>(() => {
+    const scoped = availableQuestions.filter(q => {
+      if (adminRole === "limited" && !LIMITED_SEMESTERS.includes(q.semester)) return false
+      return true
+    })
+
+    const map = new Map<string, Question[]>()
+
+    for (const q of scoped) {
+      const qText = (q.questionText || "")
+        .trim()
+        .toLowerCase()
+        .replace(/\r\n/g, "\n")
+        .replace(/\s+/g, " ")
+      const aText = (q.answer || (Array.isArray(q.correctAnswer) ? q.correctAnswer.join(", ") : String(q.correctAnswer || "")))
+        .trim()
+        .toLowerCase()
+        .replace(/\r\n/g, "\n")
+        .replace(/\s+/g, " ")
+
+      if (!qText && !aText) continue
+
+      const key = `${q.semester || ""}:::${qText}:::${aText}`
+      if (!map.has(key)) {
+        map.set(key, [])
+      }
+      map.get(key)!.push(q)
+    }
+
+    const groups: DuplicateGroup[] = []
+
+    for (const [key, list] of map.entries()) {
+      if (list.length > 1) {
+        const sorted = [...list].sort((a, b) => {
+          const aIsCustom = a.id.startsWith("custom-")
+          const bIsCustom = b.id.startsWith("custom-")
+          if (!aIsCustom && bIsCustom) return -1
+          if (aIsCustom && !bIsCustom) return 1
+
+          const timeA = aIsCustom ? parseInt(a.id.split("-")[1]) || 0 : 0
+          const timeB = bIsCustom ? parseInt(b.id.split("-")[1]) || 0 : 0
+          if (timeA !== timeB) return timeA - timeB
+
+          return (a.questionNumber || 0) - (b.questionNumber || 0)
+        })
+
+        groups.push({
+          key,
+          semester: sorted[0].semester,
+          questionText: sorted[0].questionText,
+          answer: sorted[0].answer,
+          original: sorted[0],
+          duplicates: sorted.slice(1),
+          all: sorted,
+        })
+      }
+    }
+
+    return groups.sort((a, b) => {
+      if (a.semester !== b.semester) return a.semester.localeCompare(b.semester)
+      return (a.original.questionNumber || 0) - (b.original.questionNumber || 0)
+    })
+  }, [availableQuestions, adminRole])
+
+  const totalDuplicateCount = useMemo(() => {
+    return duplicateGroups.reduce((acc, g) => acc + g.duplicates.length, 0)
+  }, [duplicateGroups])
+
+  const duplicateQuestionIdSet = useMemo(() => {
+    const set = new Set<string>()
+    for (const g of duplicateGroups) {
+      for (const q of g.all) {
+        set.add(q.id)
+      }
+    }
+    return set
+  }, [duplicateGroups])
+
+  const handleDeleteDuplicates = async (idsToDelete?: string[]) => {
+    const ids = idsToDelete || duplicateGroups.flatMap(g => g.duplicates.map(d => d.id))
+    if (ids.length === 0) {
+      alert("Inga dubbletter att ta bort.")
+      return
+    }
+
+    const confirmMsg = idsToDelete && idsToDelete.length === 1
+      ? "Är du säker på att du vill ta bort denna dubblett?"
+      : idsToDelete
+        ? `Är du säker på att du vill ta bort dessa ${ids.length} dubbletter?`
+        : `Är du säker på att du vill ta bort ALLA ${ids.length} dubbletter? (1 originalkopia av varje fråga kommer att behållas)`
+
+    if (!confirm(confirmMsg)) return
+
+    setDeletingDuplicates(true)
+    try {
+      const res = await fetch("/api/questions", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids })
+      })
+
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "Misslyckades att ta bort dubbletter")
+
+      await loadAvailableQuestions()
+      alert(`Klart! ${ids.length} dubblett(er) har tagits bort och 1 original har behållits för varje fråga.`)
+    } catch (error: any) {
+      console.error("Failed to delete duplicates", error)
+      alert(`Kunde inte ta bort dubbletter: ${error.message}`)
+    } finally {
+      setDeletingDuplicates(false)
+    }
+  }
+
   const filteredManageQuestions = availableQuestions.filter(q => {
     // Limited admin only sees T4 and T5
     if (adminRole === "limited" && !LIMITED_SEMESTERS.includes(q.semester)) return false
@@ -704,6 +847,7 @@ export default function AdminPage() {
     if (manageSubject !== "all" && q.subjectArea !== manageSubject) return false
     if (manageVisibility === "visible" && q.isHidden) return false
     if (manageVisibility === "hidden" && !q.isHidden) return false
+    if (manageVisibility === "duplicates" && !duplicateQuestionIdSet.has(q.id)) return false
 
     if (manageSearchQuery.trim() !== "") {
       const query = manageSearchQuery.toLowerCase().trim()
@@ -846,6 +990,11 @@ export default function AdminPage() {
                 <Badge variant="secondary" className="ml-1">
                   {filteredManageQuestions.length}
                 </Badge>
+                {totalDuplicateCount > 0 && (
+                  <Badge variant="destructive" className="ml-1 text-[10px] px-1.5 py-0 h-4">
+                    {totalDuplicateCount} dubbletter
+                  </Badge>
+                )}
               </TabsTrigger>
               {adminRole === "super" && (
                 <TabsTrigger value="feedback" className="gap-2">
@@ -1118,8 +1267,9 @@ export default function AdminPage() {
                     </div>
                     <Button
                       onClick={handleSaveAll}
-                      disabled={approvedCount === 0}
+                      disabled={approvedCount === 0 || isSavingAll}
                     >
+                      {isSavingAll && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                       Spara {approvedCount} frågor
                     </Button>
                   </div>
@@ -1288,12 +1438,15 @@ export default function AdminPage() {
                         <SelectItem value="all">Alla (Synliga/Dolda)</SelectItem>
                         <SelectItem value="visible">Endast synliga</SelectItem>
                         <SelectItem value="hidden">Endast dolda</SelectItem>
+                        <SelectItem value="duplicates">
+                          Endast dubbletter {totalDuplicateCount > 0 ? `(${totalDuplicateCount})` : ""}
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
 
                   <div className="flex items-center justify-between border-b pb-4">
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-3 flex-wrap">
                       <p className="text-sm text-muted-foreground">
                         Visar <span className="font-medium text-foreground">{filteredManageQuestions.length}</span> av {availableQuestions.length} frågor
                       </p>
@@ -1302,7 +1455,7 @@ export default function AdminPage() {
                         onClick={() => {
                           setNewQuestion({
                             id: `custom-${Date.now()}`,
-                            semester: "T1",
+                            semester: adminRole === "limited" ? "T4" : "T1",
                             examType: "regular",
                             examDate: new Date().toISOString().split('T')[0],
                             examPeriod: "VT24",
@@ -1322,6 +1475,20 @@ export default function AdminPage() {
                         <Plus className="h-4 w-4" />
                         Skapa ny fråga
                       </Button>
+                      <Button
+                        size="sm"
+                        variant={totalDuplicateCount > 0 ? "destructive" : "outline"}
+                        onClick={() => setIsDuplicatesDialogOpen(true)}
+                        className="gap-2 h-8"
+                      >
+                        <Copy className="h-4 w-4" />
+                        Hantera dubbletter
+                        {totalDuplicateCount > 0 && (
+                          <Badge variant="secondary" className="bg-destructive-foreground text-destructive font-bold text-xs h-5 px-1.5 ml-1">
+                            {totalDuplicateCount}
+                          </Badge>
+                        )}
+                      </Button>
                     </div>
                     <Button
                       variant="ghost"
@@ -1333,6 +1500,45 @@ export default function AdminPage() {
                       Sortera: {manageSortOrder === "desc" ? "Nyaste först" : "Äldsta först"}
                     </Button>
                   </div>
+
+                  {totalDuplicateCount > 0 && (
+                    <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-full bg-destructive/20 text-destructive shrink-0">
+                          <AlertTriangle className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-foreground">
+                            {totalDuplicateCount} dubblett{totalDuplicateCount === 1 ? "" : "er"} upptäcktes ({duplicateGroups.length} unika frågor har dubbletter)
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Detta sker oftast när man råkat trycka på spara/lägg till flera gånger. Du kan granska och ta bort dem med ett klick.
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setIsDuplicatesDialogOpen(true)}
+                          className="gap-1.5"
+                        >
+                          <Eye className="h-4 w-4" />
+                          Granska dubbletter
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => handleDeleteDuplicates()}
+                          disabled={deletingDuplicates}
+                          className="gap-1.5"
+                        >
+                          {deletingDuplicates ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                          Rensa alla ({totalDuplicateCount})
+                        </Button>
+                      </div>
+                    </div>
+                  )}
 
                   {filteredManageQuestions.length === 0 ? (
                     <p className="text-sm text-muted-foreground py-8 text-center">
@@ -1357,6 +1563,12 @@ export default function AdminPage() {
                                   <Badge variant="secondary" className="text-xs">
                                     {subjectLabels[question.subjectArea]}
                                   </Badge>
+                                  {duplicateQuestionIdSet.has(question.id) && (
+                                    <Badge variant="destructive" className="text-xs flex items-center gap-1">
+                                      <Copy className="h-3 w-3" />
+                                      Dubblett
+                                    </Badge>
+                                  )}
                                   {question.points !== undefined && (
                                     <Badge variant="outline" className="text-xs bg-accent/5 border-accent/20">
                                       {question.points} p
@@ -1945,7 +2157,8 @@ export default function AdminPage() {
                 <Button variant="outline" onClick={() => setEditingAvailableQuestion(null)}>
                   Avbryt
                 </Button>
-                <Button onClick={handleSaveEditAvailable}>
+                <Button onClick={handleSaveEditAvailable} disabled={isSavingEdit}>
+                  {isSavingEdit && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
                   Spara ändringar
                 </Button>
               </div>
@@ -2298,11 +2511,236 @@ export default function AdminPage() {
                 <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
                   Avbryt
                 </Button>
-                <Button onClick={handleCreateQuestion}>
+                <Button onClick={handleCreateQuestion} disabled={isCreatingQuestion}>
+                  {isCreatingQuestion && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
                   Skapa fråga
                 </Button>
               </div>
             </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Duplicates Modal */}
+      {isDuplicatesDialogOpen && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <Card className="w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden shadow-2xl border-border">
+            <CardHeader className="border-b shrink-0 pb-4">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <CardTitle className="flex items-center gap-2 text-xl font-bold">
+                    <Copy className="h-5 w-5 text-primary" />
+                    Dubbletthantering
+                    {totalDuplicateCount > 0 && (
+                      <Badge variant="destructive" className="ml-2 font-bold">
+                        {totalDuplicateCount} dubbletter
+                      </Badge>
+                    )}
+                  </CardTitle>
+                  <CardDescription className="mt-1">
+                    Frågor som har identisk frågetext och svar grupperas här. Du kan granska dem och ta bort överflödiga kopior med en knapp (den äldsta originalfrågan behålls alltid automatiskt).
+                  </CardDescription>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setIsDuplicatesDialogOpen(false)}
+                >
+                  <X className="h-5 w-5" />
+                </Button>
+              </div>
+
+              {totalDuplicateCount > 0 && (
+                <div className="mt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 bg-destructive/10 border border-destructive/20 rounded-lg">
+                  <div className="text-sm">
+                    <span className="font-semibold text-foreground">
+                      {duplicateGroups.length} unika frågor
+                    </span>{" "}
+                    har totalt{" "}
+                    <span className="font-bold text-destructive">
+                      {totalDuplicateCount} extra kopior
+                    </span>{" "}
+                    som kan rensas bort.
+                  </div>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => handleDeleteDuplicates()}
+                    disabled={deletingDuplicates}
+                    className="gap-2 font-medium shrink-0"
+                  >
+                    {deletingDuplicates ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-4 w-4" />
+                    )}
+                    Ta bort alla dubbletter ({totalDuplicateCount} st)
+                  </Button>
+                </div>
+              )}
+            </CardHeader>
+
+            <CardContent className="flex-1 overflow-y-auto p-4 space-y-4">
+              {duplicateGroups.length === 0 ? (
+                <div className="py-16 text-center space-y-3">
+                  <div className="h-12 w-12 rounded-full bg-green-500/10 text-green-600 flex items-center justify-center mx-auto">
+                    <Check className="h-6 w-6" />
+                  </div>
+                  <h3 className="text-lg font-medium text-foreground">Inga dubbletter hittades!</h3>
+                  <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                    Alla frågor i din vy är unika. Det finns inga identiska dubbletter att rensa.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {duplicateGroups.map((group) => (
+                    <Card key={group.key} className="border-border overflow-hidden">
+                      <div className="bg-secondary/40 p-3 border-b flex items-center justify-between gap-2 flex-wrap">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Badge variant="outline" className="font-semibold text-xs">
+                            {group.semester}
+                          </Badge>
+                          {group.original.caseName && (
+                            <Badge variant="outline" className="bg-accent/10 border-accent/30 text-accent font-semibold text-xs">
+                              {group.original.caseName}
+                            </Badge>
+                          )}
+                          <Badge variant="secondary" className="text-xs">
+                            {subjectLabels[group.original.subjectArea] || group.original.subjectArea}
+                          </Badge>
+                          <Badge variant="outline" className="text-xs text-muted-foreground">
+                            {group.original.examPeriod}
+                          </Badge>
+                          <span className="text-xs text-muted-foreground font-medium">
+                            Fråga #{group.original.questionNumber}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <Badge variant="destructive" className="text-xs">
+                            {group.all.length} kopior ({group.duplicates.length} kan tas bort)
+                          </Badge>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => handleDeleteDuplicates(group.duplicates.map(d => d.id))}
+                            disabled={deletingDuplicates}
+                          >
+                            <Trash2 className="h-3.5 w-3.5 mr-1" />
+                            Rensa denna grupp ({group.duplicates.length})
+                          </Button>
+                        </div>
+                      </div>
+
+                      <CardContent className="p-4 space-y-3">
+                        <div className="space-y-1">
+                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                            Frågetext:
+                          </p>
+                          <p className="text-sm font-medium text-foreground whitespace-pre-wrap bg-background p-2.5 rounded border">
+                            {group.questionText}
+                          </p>
+                        </div>
+
+                        <div className="space-y-1">
+                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                            Svar / Förklaring:
+                          </p>
+                          <p className="text-sm text-foreground/90 whitespace-pre-wrap bg-background p-2.5 rounded border line-clamp-3">
+                            {group.answer}
+                          </p>
+                        </div>
+
+                        <div className="pt-1">
+                          <p className="text-xs font-semibold text-muted-foreground mb-2">
+                            Alla sparade kort ({group.all.length} st):
+                          </p>
+                          <div className="space-y-2">
+                            {group.all.map((q, idx) => {
+                              const isOriginal = idx === 0
+                              return (
+                                <div
+                                  key={q.id}
+                                  className={`flex items-center justify-between p-2.5 rounded-lg border text-xs gap-3 ${
+                                    isOriginal
+                                      ? "bg-green-500/10 border-green-500/30 text-foreground"
+                                      : "bg-destructive/5 border-destructive/20 text-foreground"
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-2 flex-wrap min-w-0">
+                                    {isOriginal ? (
+                                      <Badge className="bg-green-600 text-white hover:bg-green-600 shrink-0 text-[10px]">
+                                        <Check className="h-3 w-3 mr-1" />
+                                        BEHÅLLS (ORIGINAL)
+                                      </Badge>
+                                    ) : (
+                                      <Badge variant="destructive" className="shrink-0 text-[10px]">
+                                        DUBBLETT #{idx} (TAS BORT)
+                                      </Badge>
+                                    )}
+                                    <span className="font-mono text-muted-foreground truncate">
+                                      ID: {q.id}
+                                    </span>
+                                    <span className="text-muted-foreground">
+                                      · {q.semester} · {q.examPeriod} · {q.examType === "regular" ? "Ordinarie" : "Omtenta"}
+                                    </span>
+                                  </div>
+
+                                  {!isOriginal && (
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="h-6 px-2 text-destructive hover:bg-destructive/10 text-xs shrink-0"
+                                      onClick={() => handleDeleteDuplicates([q.id])}
+                                      disabled={deletingDuplicates}
+                                    >
+                                      <Trash2 className="h-3 w-3 mr-1" />
+                                      Ta bort endast denna
+                                    </Button>
+                                  )}
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+
+            <CardFooter className="border-t p-4 flex justify-between items-center bg-secondary/10 shrink-0">
+              <p className="text-xs text-muted-foreground">
+                {duplicateGroups.length > 0
+                  ? `Visar ${duplicateGroups.length} grupper med dubbletter.`
+                  : "Inga dubbletter att visa."}
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setIsDuplicatesDialogOpen(false)}
+                >
+                  Stäng
+                </Button>
+                {totalDuplicateCount > 0 && (
+                  <Button
+                    variant="destructive"
+                    onClick={() => handleDeleteDuplicates()}
+                    disabled={deletingDuplicates}
+                    className="gap-2"
+                  >
+                    {deletingDuplicates ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-4 w-4" />
+                    )}
+                    Ta bort alla dubbletter ({totalDuplicateCount} st)
+                  </Button>
+                )}
+              </div>
+            </CardFooter>
           </Card>
         </div>
       )}

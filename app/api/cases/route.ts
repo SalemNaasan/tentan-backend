@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
-import { supabase } from "@/lib/supabase"
+import { supabaseAdmin as supabase } from "@/lib/supabase-server"
+import { requireAdmin } from "@/lib/admin-auth"
 import { PPLCase } from "@/lib/types"
 
 export const dynamic = "force-dynamic"
@@ -34,6 +35,9 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+    const auth = requireAdmin(req, "super")
+    if (auth instanceof NextResponse) return auth
+
     try {
         const body: PPLCase = await req.json()
 
@@ -60,6 +64,9 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+    const auth = requireAdmin(req, "super")
+    if (auth instanceof NextResponse) return auth
+
     try {
         const { searchParams } = new URL(req.url)
         const id = searchParams.get("id")

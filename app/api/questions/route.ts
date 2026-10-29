@@ -1,9 +1,41 @@
 import { NextRequest, NextResponse } from "next/server"
 import { mockQuestions } from "@/lib/mock-data"
-import { supabase } from "@/lib/supabase"
+import { supabaseAdmin as supabase } from "@/lib/supabase-server"
+import { LIMITED_SEMESTERS, requireAdmin, type AdminRole } from "@/lib/admin-auth"
 import type { Question } from "@/lib/types"
 
 export const dynamic = "force-dynamic"
+
+// Gästrollen ("limited") får bara ändra frågor i LIMITED_SEMESTERS.
+// Kontrollerar både frågornas nuvarande termin (i databasen) och eventuell ny termin.
+async function checkLimitedAccess(role: AdminRole, ids: string[], newSemesters: string[] = []): Promise<NextResponse | null> {
+  if (role === "super") return null
+
+  const forbidden = () =>
+    NextResponse.json({ error: `Gästkontot får bara ändra frågor för ${LIMITED_SEMESTERS.join(" & ")}` }, { status: 403 })
+
+  if (newSemesters.some(s => !LIMITED_SEMESTERS.includes(s as any))) return forbidden()
+
+  const mockById = new Map(mockQuestions.map(q => [q.id, q.semester]))
+  const customIds = ids.filter(id => !mockById.has(id))
+
+  for (const id of ids) {
+    const semester = mockById.get(id)
+    if (semester && !LIMITED_SEMESTERS.includes(semester)) return forbidden()
+  }
+
+  const CHUNK_SIZE = 500
+  for (let i = 0; i < customIds.length; i += CHUNK_SIZE) {
+    const { data, error } = await supabase
+      .from('custom_questions')
+      .select('id, semester')
+      .in('id', customIds.slice(i, i + CHUNK_SIZE))
+    if (error) throw error
+    if ((data || []).some(q => !LIMITED_SEMESTERS.includes(q.semester))) return forbidden()
+  }
+
+  return null
+}
 
 // Supabase/PostgREST returnerar max 1000 rader per query som standard.
 // Denna hjälpare sidindelar och hämtar ALLA rader oavsett antal.
@@ -90,8 +122,18 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const auth = requireAdmin(req)
+  if (auth instanceof NextResponse) return auth
+
   try {
     const questions: Question[] = await req.json()
+
+    if (!Array.isArray(questions)) {
+      return NextResponse.json({ error: "Förväntade en lista med frågor" }, { status: 400 })
+    }
+
+    const denied = await checkLimitedAccess(auth, questions.map(q => q.id), questions.map(q => q.semester))
+    if (denied) return denied
 
     // Convert to snake_case for Supabase
     const toUpsert = questions.map(q => ({
@@ -137,12 +179,18 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
+  const auth = requireAdmin(req)
+  if (auth instanceof NextResponse) return auth
+
   try {
     const { id, isHidden } = await req.json()
 
-    if (!id) {
+    if (!id || typeof id !== "string") {
       return NextResponse.json({ error: "Missing ID" }, { status: 400 })
     }
+
+    const denied = await checkLimitedAccess(auth, [id])
+    if (denied) return denied
 
     if (id.startsWith('custom-')) {
       // Update custom question
@@ -176,6 +224,9 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+  const auth = requireAdmin(req)
+  if (auth instanceof NextResponse) return auth
+
   try {
     let ids: string[] = []
     const { searchParams } = new URL(req.url)
@@ -202,6 +253,9 @@ export async function DELETE(req: NextRequest) {
     if (ids.length === 0) {
       return NextResponse.json({ error: "Missing ID" }, { status: 400 })
     }
+
+    const denied = await checkLimitedAccess(auth, ids)
+    if (denied) return denied
 
     const customIds = ids.filter(i => i.startsWith('custom-'))
     const mockIds = ids.filter(i => !i.startsWith('custom-'))

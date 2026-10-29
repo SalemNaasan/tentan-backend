@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
-import { supabase } from "@/lib/supabase"
+import { supabaseAdmin as supabase } from "@/lib/supabase-server"
+import { requireAdmin } from "@/lib/admin-auth"
 
 export const dynamic = "force-dynamic"
 
@@ -21,6 +22,9 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+    const auth = requireAdmin(req, "super")
+    if (auth instanceof NextResponse) return auth
+
     try {
         const { content } = await req.json()
 

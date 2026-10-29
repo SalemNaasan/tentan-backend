@@ -4,7 +4,6 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { supabase } from "@/lib/supabase"
 import { Loader2, X, Upload, Image as ImageIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -23,24 +22,19 @@ export function ImageUpload({ value, onChange, disabled }: ImageUploadProps) {
             const file = e.target.files?.[0]
             if (!file) return
 
-            const fileExt = file.name.split('.').pop()
-            const fileName = `${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`
-            const filePath = `${fileName}`
+            // Uppladdningen går via servern, som kontrollerar att man är inloggad som admin
+            const formData = new FormData()
+            formData.append('file', file)
 
-            const { error: uploadError } = await supabase.storage
-                .from('question-images')
-                .upload(filePath, file)
+            const res = await fetch('/api/admin/upload-image', { method: 'POST', body: formData })
+            const data = await res.json().catch(() => ({}))
 
-            if (uploadError) throw uploadError
+            if (!res.ok) throw new Error(data.error || 'Uppladdningen misslyckades')
 
-            const { data: { publicUrl } } = supabase.storage
-                .from('question-images')
-                .getPublicUrl(filePath)
-
-            onChange(publicUrl)
-        } catch (error) {
+            onChange(data.url)
+        } catch (error: any) {
             console.error('Error uploading image:', error)
-            alert('Misslyckades att ladda upp bild. Kontrollera att din Supabase bucket "question-images" är publik.')
+            alert(`Misslyckades att ladda upp bild: ${error.message}`)
         } finally {
             setUploading(false)
         }

@@ -31,8 +31,7 @@ import { ImageUpload } from "@/components/admin/image-upload"
 // import { getFeedback, updateFeedbackStatus } from "@/lib/feedback-store"
 
 
-const ADMIN_PASSWORD = "salem"
-const GUEST_PASSWORD = "jad"
+// Lösenorden kontrolleras på servern (/api/admin/session), se lib/admin-auth.ts
 const LIMITED_SEMESTERS: Semester[] = ["T4", "T5"]
 
 interface ExtractedQuestion {
@@ -90,6 +89,8 @@ export default function AdminPage() {
   const [adminRole, setAdminRole] = useState<"super" | "limited" | null>(null)
   const [passwordInput, setPasswordInput] = useState("")
   const [passwordError, setPasswordError] = useState(false)
+  const [isLoggingIn, setIsLoggingIn] = useState(false)
+  const [sessionChecked, setSessionChecked] = useState(false)
 
   const [uploadState, setUploadState] = useState<UploadState>({
     status: "idle",
@@ -261,9 +262,24 @@ export default function AdminPage() {
     loadAvailableQuestions()
   }, [loadAvailableQuestions])
 
+  // Feedback kräver super-inloggning, så den laddas först när rollen är känd
   useEffect(() => {
-    loadFeedback()
-  }, [loadFeedback])
+    if (adminRole === "super") loadFeedback()
+  }, [loadFeedback, adminRole])
+
+  // Återställ inloggningen från sessionscookien vid sidladdning
+  useEffect(() => {
+    fetch("/api/admin/session", { cache: "no-store" })
+      .then(res => res.json())
+      .then(data => {
+        if (data?.role === "super" || data?.role === "limited") {
+          setAdminRole(data.role)
+          if (data.role === "limited") setSelectedSemester("T4")
+        }
+      })
+      .catch(() => { })
+      .finally(() => setSessionChecked(true))
+  }, [])
 
   useEffect(() => {
     loadNews()
@@ -892,18 +908,44 @@ export default function AdminPage() {
   }
 
 
-  const handlePasswordSubmit = (e: React.FormEvent) => {
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (passwordInput === ADMIN_PASSWORD) {
-      setAdminRole("super")
+    if (isLoggingIn) return
+    setIsLoggingIn(true)
+    try {
+      const res = await fetch("/api/admin/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: passwordInput }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || (data.role !== "super" && data.role !== "limited")) {
+        setPasswordError(true)
+        return
+      }
+      setAdminRole(data.role)
+      if (data.role === "limited") setSelectedSemester("T4")
+      setPasswordInput("")
       setPasswordError(false)
-    } else if (passwordInput === GUEST_PASSWORD) {
-      setAdminRole("limited")
-      setSelectedSemester("T4")
-      setPasswordError(false)
-    } else {
+    } catch (error) {
+      console.error("Login failed", error)
       setPasswordError(true)
+    } finally {
+      setIsLoggingIn(false)
     }
+  }
+
+  const handleLogout = async () => {
+    await fetch("/api/admin/session", { method: "DELETE" }).catch(() => { })
+    setAdminRole(null)
+  }
+
+  if (!sessionChecked) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    )
   }
 
   if (!adminRole) {
@@ -942,7 +984,8 @@ export default function AdminPage() {
                     <p className="text-sm text-destructive">Felaktigt lösenord</p>
                   )}
                 </div>
-                <Button type="submit" className="w-full">
+                <Button type="submit" className="w-full" disabled={isLoggingIn}>
+                  {isLoggingIn && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Öppna adminpanelen
                 </Button>
               </form>
@@ -962,8 +1005,11 @@ export default function AdminPage() {
         <div className="mx-auto max-w-5xl px-4 py-8">
           {/* Page Header */}
           <div className="mb-8">
-            <div className="flex items-center gap-2 mb-2">
+            <div className="flex items-center justify-between gap-2 mb-2">
               <Badge variant="outline" className="text-xs">Admin</Badge>
+              <Button variant="ghost" size="sm" onClick={handleLogout}>
+                Logga ut
+              </Button>
             </div>
             <h1 className="text-3xl font-bold tracking-tight text-foreground">
               Tentahantering

@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from "next/server"
-import { supabase } from "@/lib/supabase"
+import { supabaseAdmin as supabase } from "@/lib/supabase-server"
+import { requireAdmin } from "@/lib/admin-auth"
 import type { QuestionFeedback } from "@/lib/types"
 
 export const dynamic = "force-dynamic"
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+    const auth = requireAdmin(req, "super")
+    if (auth instanceof NextResponse) return auth
+
     try {
         const { data, error } = await supabase
             .from('question_feedback')
@@ -35,12 +39,19 @@ export async function POST(req: NextRequest) {
     try {
         const feedback: Omit<QuestionFeedback, "id" | "createdAt" | "status"> = await req.json()
 
+        if (typeof feedback.feedbackText !== "string" || !feedback.feedbackText.trim()) {
+            return NextResponse.json({ error: "Feedback saknas" }, { status: 400 })
+        }
+        if (feedback.feedbackText.length > 2000) {
+            return NextResponse.json({ error: "Feedbacken är för lång (max 2000 tecken)" }, { status: 400 })
+        }
+
         const { error } = await supabase
             .from('question_feedback')
             .insert({
                 id: `fb-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
-                question_id: feedback.questionId,
-                question_preview: feedback.questionPreview,
+                question_id: String(feedback.questionId ?? "").slice(0, 100),
+                question_preview: String(feedback.questionPreview ?? "").slice(0, 500),
                 feedback_text: feedback.feedbackText,
                 status: 'new'
             })
@@ -55,6 +66,9 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
+    const auth = requireAdmin(req, "super")
+    if (auth instanceof NextResponse) return auth
+
     try {
         const { id, status } = await req.json()
 

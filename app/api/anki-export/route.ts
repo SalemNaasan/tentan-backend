@@ -14,6 +14,16 @@ type AnkiExportRequestBody = {
   cards: AnkiCard[]
 }
 
+function isAllowedImageUrl(url: string): boolean {
+  try {
+    const allowedHost = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL!).host
+    const parsed = new URL(url)
+    return parsed.protocol === "https:" && parsed.host === allowedHost
+  } catch {
+    return false
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { deckName = "tentan.nu Deck", cards }: AnkiExportRequestBody = await req.json()
@@ -41,7 +51,9 @@ export async function POST(req: NextRequest) {
 
       const backContent = card.back
 
-      if (card.imageUrl) {
+      // Hämta bara bilder från vår egen Supabase-lagring, så att servern inte kan
+      // användas för att anropa godtyckliga adresser
+      if (card.imageUrl && isAllowedImageUrl(card.imageUrl)) {
         try {
           const imageRes = await fetch(card.imageUrl)
           if (imageRes.ok) {

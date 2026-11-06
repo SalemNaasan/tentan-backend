@@ -2059,7 +2059,23 @@ export default function AdminPage() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="avail-edit-options">Alternativ (separerade med |)</Label>
+                {editingAvailableQuestion.interaction === "drag_matching" ? (
+                  <>
+                    <Label htmlFor="avail-edit-options">Matchningspar (Begrepp | Förklaring, ett per rad)</Label>
+                    <Textarea
+                      id="avail-edit-options"
+                      rows={5}
+                      value={editingAvailableQuestion.options?.join("\n") || ""}
+                      onChange={(e) =>
+                        setEditingAvailableQuestion((prev) =>
+                          prev ? { ...prev, options: e.target.value.split("\n") } : null
+                        )
+                      }
+                    />
+                  </>
+                ) : (
+                  <>
+                    <Label htmlFor="avail-edit-options">Alternativ (separerade med |)</Label>
                 <Input
                   id="avail-edit-options"
                   value={editingAvailableQuestion.options?.join(" | ") || ""}
@@ -2069,6 +2085,8 @@ export default function AdminPage() {
                     )
                   }
                 />
+                  </>
+                )}
               </div>
               <ImageUpload
                 value={editingAvailableQuestion.imageUrl}
@@ -2287,7 +2305,23 @@ export default function AdminPage() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="edit-options">Alternativ (separerade med |)</Label>
+                  {editingQuestion.interaction === "drag_matching" ? (
+                    <>
+                      <Label htmlFor="edit-options">Matchningspar (Begrepp | Förklaring, ett per rad)</Label>
+                      <Textarea
+                        id="edit-options"
+                        rows={5}
+                        value={editingQuestion.options?.join("\n") || ""}
+                        onChange={(e) =>
+                          setEditingQuestion((prev) =>
+                            prev ? { ...prev, options: e.target.value.split("\n") } : null
+                          )
+                        }
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <Label htmlFor="edit-options">Alternativ (separerade med |)</Label>
                   <Input
                     id="edit-options"
                     value={editingQuestion.options?.join(" | ") || ""}
@@ -2297,6 +2331,8 @@ export default function AdminPage() {
                       )
                     }
                   />
+                    </>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="edit-points">Poäng</Label>

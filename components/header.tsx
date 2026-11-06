@@ -4,13 +4,15 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { BookOpen } from "lucide-react"
+import { FEATURES } from "@/lib/features"
 
 export function Header() {
   const pathname = usePathname()
 
   const navLinks = [
     { href: "/study", label: "Plugga" },
-    { href: "/cases", label: "PPL/Fall" },
+    ...(FEATURES.cases ? [{ href: "/cases", label: "PPL/Fall" }] : []),
+    { href: "/osce", label: "OSCE" },
     { href: "/about", label: "Om oss" },
   ]
 

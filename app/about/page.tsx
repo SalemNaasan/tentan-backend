@@ -1,3 +1,4 @@
+import Link from "next/link"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -37,7 +38,7 @@ export default function AboutPage() {
             <section>
               <h2 className="mb-4 text-xl font-semibold text-foreground">Om skaparen</h2>
               <p className="text-muted-foreground leading-relaxed">
-                Sidan skapades och drivs av <strong>Salem Naasan</strong>, läkarstudent (T2)
+                Sidan skapades och drivs av <strong>Salem Naasan</strong>, läkarstudent (T3)
                 vid Linköpings universitet. Mitt mål med plattformen är att underlätta
                 studietiden för mina medstudenter genom att tillhandahålla ett smidigt
                 verktyg för tentaövning.
@@ -94,6 +95,39 @@ export default function AboutPage() {
               </p>
             </section>
 
+            {/* OSCE */}
+            <section>
+              <h2 className="mb-4 text-xl font-semibold text-foreground">OSCE-simulator för T3</h2>
+              <p className="text-muted-foreground leading-relaxed">
+                Inför den praktiska tentamen på termin 3 finns en{" "}
+                <Link href="/osce" className="text-accent hover:underline">
+                  OSCE-simulator
+                </Link>{" "}
+                med 44 stationer från ordinarie tentor och omtentor HT24–VT26. Du undersöker en virtuell
+                patient i 3D: lyssnar med stetoskop, placerar EKG-elektroder, mäter blodtryck och gör
+                HLR med hjärtstartare.
+              </p>
+              <ul className="mt-4 list-disc space-y-2 pl-5 text-muted-foreground leading-relaxed">
+                <li>
+                  <strong>Gör en gammal tenta:</strong> kör exakt de fyra stationer som kom på en viss tenta,
+                  till exempel VT26 ordinarie fm.
+                </li>
+                <li>
+                  <strong>Slumpad tenta:</strong> fyra stationer från olika teman med 10 minuter per station,
+                  visselsignaler och resultat. Godkänt är 30 av 40 poäng.
+                </li>
+                <li>
+                  <strong>Fri övning:</strong> träna en station i egen takt med facit och förklaringar direkt.
+                </li>
+                <li>
+                  <strong>Alla frågor:</strong> bläddra bland alla gamla praktiska frågor, sortera och se svaren.
+                </li>
+              </ul>
+              <p className="mt-4 text-muted-foreground leading-relaxed">
+                Praktiska moment rättas automatiskt, medan muntliga frågor bedömer du själv mot facit.
+              </p>
+            </section>
+
             {/* Important Notice */}
             <Card className="border-border bg-secondary/30">
               <CardHeader className="pb-2">
@@ -112,6 +146,10 @@ export default function AboutPage() {
                 <p className="mt-3 text-sm text-muted-foreground leading-relaxed">
                   Innehållet administreras med mänsklig övervakning, men kan innehålla
                   fel eller föråldrad information. Använd ditt eget omdöme när du studerar.
+                </p>
+                <p className="mt-3 text-sm text-muted-foreground leading-relaxed">
+                  Simulatorn är inte en officiell tenta. Några OSCE-protokoll saknar poäng eller facit, och där
+                  har de uppskattats. Det står i så fall på stationen.
                 </p>
               </CardContent>
             </Card>
@@ -184,6 +222,16 @@ export default function AboutPage() {
                     Välj de frågor du vill öva på med hjälp av kryssrutorna,
                     klicka sedan på exportknappen. Filen kan importeras direkt
                     till Anki för dator eller mobil.
+                  </p>
+                </div>
+                <div>
+                  <h3 className="font-medium text-foreground">
+                    Hur fungerar OSCE-simulatorn?
+                  </h3>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Välj en gammal tenta, en slumpad tenta eller en enskild station på OSCE-sidan. Använd gärna
+                    hörlurar, eftersom stetoskopet och blodtrycksmätningen bygger på ljud. Resultatet visas direkt
+                    efter tentan och sparas inte.
                   </p>
                 </div>
               </div>

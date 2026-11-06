@@ -27,6 +27,7 @@ import type { Semester, ExamType, ExamPeriod, SubjectArea, Question, Interaction
 import { Download, X, Filter, ChevronLeft, ChevronRight, CheckSquare, Square, Star, ArrowUpDown, ArrowUp, ArrowDown, Search } from "lucide-react"
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet"
 import { getBookmarkedIds, toggleBookmark as toggleBookmarkInStore, addBookmarks, removeBookmarks } from "@/lib/bookmarks-store"
+import { parseMatchingPairs } from "@/lib/matching"
 
 const PAGE_SIZE = 10
 
@@ -224,15 +225,10 @@ export default function StudyPage() {
         const parsedSources: string[] = []
         const parsedTargets: string[] = []
         
-        if (q.options) {
-          q.options.forEach((opt) => {
-            const parts = opt.split("|").map(s => s.trim())
-            if (parts.length >= 2) {
-              parsedSources.push(parts[0])
-              parsedTargets.push(parts[1])
-            }
-          })
-        }
+        parseMatchingPairs(q.options).forEach(([src, target]) => {
+          parsedSources.push(src)
+          parsedTargets.push(target)
+        })
 
         // Shuffled explanations for the front side to test the user
         const shuffledTargets = [...parsedTargets].sort(() => Math.random() - 0.5)

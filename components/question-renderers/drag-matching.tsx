@@ -20,6 +20,7 @@ import {
 import { useDraggable } from "@dnd-kit/core"
 import { CSS } from "@dnd-kit/utilities"
 import { cn } from "@/lib/utils"
+import { parseMatchingPairs } from "@/lib/matching"
 
 interface Item {
     id: string
@@ -70,14 +71,9 @@ export function DragMatchingRenderer({
         const parsedSources: Item[] = []
         const parsedTargets: Item[] = []
 
-        options.forEach((opt, idx) => {
-            const parts = opt.split("|").map(s => s.trim())
-            if (parts.length >= 2) {
-                const src = parts[0]
-                const target = parts[1]
-                parsedSources.push({ id: `src-${idx}`, content: src })
-                parsedTargets.push({ id: `target-${idx}`, content: target })
-            }
+        parseMatchingPairs(options).forEach(([src, target], idx) => {
+            parsedSources.push({ id: `src-${idx}`, content: src })
+            parsedTargets.push({ id: `target-${idx}`, content: target })
         })
 
         setSources(parsedSources)

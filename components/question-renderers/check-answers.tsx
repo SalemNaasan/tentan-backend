@@ -1,9 +1,10 @@
 "use client"
 
-import { useId, ReactNode } from "react"
+import { useId, useMemo, ReactNode } from "react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
+import { shuffledOrder } from "@/lib/shuffle"
 
 interface CheckAnswersRendererProps {
     options: string[]
@@ -27,6 +28,9 @@ export function CheckAnswersRenderer({
     searchQuery
 }: CheckAnswersRendererProps) {
     const baseId = useId()
+    // Ny ordning vid varje sidladdning; bokstaven (a, b, c...) följer alltid sitt alternativ
+    const optionsKey = options.join("\n")
+    const order = useMemo(() => shuffledOrder(options), [optionsKey])
 
     // Helper: highlight search query matches in text
     const highlightText = (text: string): ReactNode => {
@@ -52,7 +56,8 @@ export function CheckAnswersRenderer({
 
     return (
         <div className="grid gap-3">
-            {options.map((option, index) => {
+            {order.map((index) => {
+                const option = options[index]
                 const key = String.fromCharCode(97 + index) // 0 -> 'a', 1 -> 'b', etc.
                 const isCorrect = correctAnswers?.includes(key.toLowerCase().trim())
                 const isSelected = value.includes(key)

@@ -444,6 +444,13 @@ export default function AdminPage() {
     )
   }
 
+  // Godkänner alla väntande frågor på en gång; avvisade frågor lämnas som de är
+  const handleApproveAll = () => {
+    setExtractedQuestions((prev) =>
+      prev.map((q) => (q.status === "pending" ? { ...q, status: "approved" as const } : q))
+    )
+  }
+
   const handleReject = (questionId: string) => {
     setExtractedQuestions((prev) =>
       prev.map((q) => (q.id === questionId ? { ...q, status: "rejected" as const } : q))
@@ -1311,13 +1318,23 @@ export default function AdminPage() {
                         <p className="text-xs text-muted-foreground">Väntande</p>
                       </div>
                     </div>
-                    <Button
-                      onClick={handleSaveAll}
-                      disabled={approvedCount === 0 || isSavingAll}
-                    >
-                      {isSavingAll && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                      Spara {approvedCount} frågor
-                    </Button>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button
+                        variant="outline"
+                        onClick={handleApproveAll}
+                        disabled={pendingCount === 0 || isSavingAll}
+                      >
+                        <Check className="h-4 w-4 mr-2" />
+                        Godkänn alla ({pendingCount})
+                      </Button>
+                      <Button
+                        onClick={handleSaveAll}
+                        disabled={approvedCount === 0 || isSavingAll}
+                      >
+                        {isSavingAll && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                        Spara {approvedCount} frågor
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>

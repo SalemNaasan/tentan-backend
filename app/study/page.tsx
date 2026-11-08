@@ -3,7 +3,7 @@
 export const dynamic = "force-dynamic"
 
 
-import { useState, useMemo, useEffect } from "react"
+import { useState, useMemo, useEffect, useRef } from "react"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { QuestionCard } from "@/components/question-card"
@@ -33,6 +33,8 @@ const PAGE_SIZE = 10
 
 
 
+
+const FILTERS_KEY = "tentan_study_filters"
 
 export default function StudyPage() {
   const [selectedSemesters, setSelectedSemesters] = useState<Semester[]>(["T1"])
@@ -72,8 +74,65 @@ export default function StudyPage() {
     loadData()
   }, [])
 
+  // Filtren sparas i webbläsaren så att de finns kvar när sidan laddas om
+  const [filtersRestored, setFiltersRestored] = useState(false)
+  const skipPageReset = useRef(false)
+
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(FILTERS_KEY) ?? "null")
+      if (saved) {
+        if (Array.isArray(saved.semesters)) setSelectedSemesters(saved.semesters)
+        if (Array.isArray(saved.examTypes)) setSelectedExamTypes(saved.examTypes)
+        if (Array.isArray(saved.subjects)) setSelectedSubjects(saved.subjects)
+        if (Array.isArray(saved.periods)) setSelectedPeriods(saved.periods)
+        if (Array.isArray(saved.interactions)) setSelectedInteractions(saved.interactions)
+        if (Array.isArray(saved.cases)) setSelectedCases(saved.cases)
+        if (typeof saved.onlyBookmarked === "boolean") setIsOnlyBookmarked(saved.onlyBookmarked)
+        if (typeof saved.sortBy === "string") setSortBy(saved.sortBy)
+        if (typeof saved.search === "string") setSearchQuery(saved.search)
+        if (typeof saved.page === "number" && saved.page > 1) {
+          skipPageReset.current = true
+          setCurrentPage(saved.page)
+        }
+      }
+    } catch {
+      // privat läge eller trasig data – standardfiltren används
+    }
+    setFiltersRestored(true)
+  }, [])
+
+  useEffect(() => {
+    if (!filtersRestored) return
+    try {
+      localStorage.setItem(
+        FILTERS_KEY,
+        JSON.stringify({
+          semesters: selectedSemesters,
+          examTypes: selectedExamTypes,
+          subjects: selectedSubjects,
+          periods: selectedPeriods,
+          interactions: selectedInteractions,
+          cases: selectedCases,
+          onlyBookmarked: isOnlyBookmarked,
+          sortBy,
+          search: searchQuery,
+          page: currentPage,
+        }),
+      )
+    } catch {
+      // går inte att spara – filtren gäller då bara tills sidan laddas om
+    }
+  }, [filtersRestored, selectedSemesters, selectedExamTypes, selectedSubjects, selectedPeriods, selectedInteractions, selectedCases, isOnlyBookmarked, sortBy, searchQuery, currentPage])
+
   // Reset page when filters change
   useEffect(() => {
+    if (!filtersRestored) return
+    // Första ändringen kommer från de sparade filtren – behåll då den sparade sidan
+    if (skipPageReset.current) {
+      skipPageReset.current = false
+      return
+    }
     setCurrentPage(1)
   }, [selectedSemesters, selectedExamTypes, selectedSubjects, selectedPeriods, isOnlyBookmarked, selectedInteractions, selectedCases, searchQuery])
 

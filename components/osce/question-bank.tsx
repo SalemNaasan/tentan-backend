@@ -12,9 +12,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { cn } from "@/lib/utils"
 import { getOsceBookmarks, toggleOsceBookmark } from "@/lib/osce/bookmarks"
-import { ALL_QUESTIONS, QUESTION_KINDS, duplicateKey, type OsceQuestion } from "@/lib/osce/questions"
-import { OSCE_PERIODS, OSCE_THEMES, examLabel, type OsceItem } from "@/lib/osce/types"
+import { QUESTION_KINDS, duplicateKey, type OsceQuestion } from "@/lib/osce/questions"
+import { useOsceQuestions } from "@/lib/osce/use-osce-data"
+import { OSCE_THEMES, examLabel, periodsOf, type OsceItem } from "@/lib/osce/types"
 import { Why } from "./item-view"
+import { OsceFeedbackButton } from "./feedback-button"
 import { TOOLS } from "./tools"
 
 const PAGE_SIZE = 20
@@ -34,8 +36,6 @@ interface Filters {
 }
 
 const EMPTY: Filters = { periods: [], types: [], sessions: [], themes: [], kinds: [], skills: [] }
-
-const SKILLS = [...new Set(ALL_QUESTIONS.flatMap(q => q.station.skills))].sort((a, b) => a.localeCompare(b, "sv"))
 
 function Answer({ item }: { item: OsceItem }) {
   return (
@@ -102,12 +102,13 @@ function QuestionCard({
         <span className="text-xs text-muted-foreground">
           {station.title} · fråga {question.number} · {fmt(question.points)} p
         </span>
+        <OsceFeedbackButton station={station} item={item} className="ml-auto h-8 gap-1.5 px-2 text-muted-foreground hover:text-foreground" />
         <button
           type="button"
           onClick={onBookmark}
           aria-pressed={bookmarked}
           aria-label={bookmarked ? "Ta bort bokmärke" : "Bokmärk frågan"}
-          className="ml-auto rounded-md p-1 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+          className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
         >
           <Star className="h-5 w-5" style={bookmarked ? { color: STAR_COLOR, fill: STAR_COLOR } : undefined} />
         </button>
@@ -190,6 +191,8 @@ function FilterGroup({
 }
 
 export function QuestionBank() {
+  const { questions: ALL_QUESTIONS } = useOsceQuestions()
+  const SKILLS = useMemo(() => [...new Set(ALL_QUESTIONS.flatMap(q => q.station.skills))].sort((a, b) => a.localeCompare(b, "sv")), [ALL_QUESTIONS])
   const [filters, setFilters] = useState<Filters>(EMPTY)
   const [search, setSearch] = useState("")
   const [sort, setSort] = useState<Sort>("newest")
@@ -265,7 +268,7 @@ export function QuestionBank() {
       list = [...list].sort((a, b) => b.points - a.points)
     }
     return list
-  }, [filters, search, sort, unique, onlyBookmarked, bookmarks])
+  }, [ALL_QUESTIONS, filters, search, sort, unique, onlyBookmarked, bookmarks])
 
   const change = <K extends keyof Filters>(key: K, value: string[]) => {
     setFilters(f => ({ ...f, [key]: value }))
@@ -295,7 +298,7 @@ export function QuestionBank() {
         />
         <Star className="h-4 w-4" style={{ color: STAR_COLOR }} /> Visa endast bokmärkta
       </Label>
-      <FilterGroup title="Tenta" options={OSCE_PERIODS.map(p => ({ id: p, label: p }))} selected={filters.periods} onChange={v => change("periods", v)} />
+      <FilterGroup title="Tenta" options={periodsOf(ALL_QUESTIONS.map(q => q.station)).map(p => ({ id: p, label: p }))} selected={filters.periods} onChange={v => change("periods", v)} />
       <FilterGroup
         title="Typ"
         options={[

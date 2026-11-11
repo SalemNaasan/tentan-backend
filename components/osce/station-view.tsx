@@ -6,6 +6,7 @@ import { Separator } from "@/components/ui/separator"
 import type { OsceStation, StationResponses, ItemResponse } from "@/lib/osce/types"
 import { OSCE_THEMES } from "@/lib/osce/types"
 import { ItemView, type ItemMode } from "./item-view"
+import { OsceFeedbackButton } from "./feedback-button"
 
 export function themeName(id: string) {
   return OSCE_THEMES.find(t => t.id === id)?.description ?? id
@@ -70,6 +71,12 @@ export function StationItems({
               mode={mode}
               locked={locked}
             />
+            {/* Feedback döljs under full simulering för att inte störa */}
+            {mode !== "exam" && (
+              <div className="-mt-3 flex justify-end">
+                <OsceFeedbackButton station={station} item={item} />
+              </div>
+            )}
           </div>
         )
       })}

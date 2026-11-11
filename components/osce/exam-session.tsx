@@ -9,6 +9,7 @@ import { Progress } from "@/components/ui/progress"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { cn } from "@/lib/utils"
 import { drawExam, getSitting, type ExamSitting } from "@/lib/osce/stations"
+import { useOsceStations } from "@/lib/osce/use-osce-data"
 import { passLimit, stationScore } from "@/lib/osce/scoring"
 import { playWhistle, getAudioContext } from "@/lib/osce/audio"
 import { STATION_MAX_POINTS, STATION_SECONDS, WARNING_SECONDS, type ItemResponse, type OsceStation, type StationResponses } from "@/lib/osce/types"
@@ -28,12 +29,13 @@ export function ExamSession() {
   const [timing, setTiming] = useState({ total: STATION_SECONDS, warning: WARNING_SECONDS })
   const [attemptId, setAttemptId] = useState("")
   const [sitting, setSitting] = useState<ExamSitting | null>(null)
+  const { stations: allStations } = useOsceStations()
 
   // ?tenta=VT26-ordinarie-fm kör en hel riktig tenta i stället för slumpade stationer
   useEffect(() => {
     const key = new URLSearchParams(window.location.search).get("tenta")
-    if (key) setSitting(getSitting(key) ?? null)
-  }, [])
+    if (key) setSitting(getSitting(key, allStations) ?? null)
+  }, [allStations])
 
   const station = stations[index]
 
@@ -61,7 +63,7 @@ export function ExamSession() {
     // ?snabb=1 i adressen ger korta stationer för att testa flödet
     const fast = new URLSearchParams(window.location.search).get("snabb") === "1"
     setTiming(fast ? { total: 40, warning: 30 } : { total: STATION_SECONDS, warning: WARNING_SECONDS })
-    setStations(sitting?.stations ?? drawExam(4))
+    setStations(sitting?.stations ?? drawExam(4, allStations))
     setResponses({})
     setIndex(0)
     setAttemptId(String(Date.now()))

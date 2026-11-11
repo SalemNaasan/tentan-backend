@@ -41,9 +41,10 @@ function answerText(item: OsceItem) {
 
 const kindOf = (item: OsceItem): QuestionKind => (item.kind === "tool" ? "praktisk" : "muntlig")
 
-function build(): OsceQuestion[] {
+/** Bygger frågelistan från stationerna (originalen eller med adminändringar) */
+export function buildQuestions(stations: OsceStation[] = ALL_STATIONS): OsceQuestion[] {
   const list: OsceQuestion[] = []
-  for (const station of ALL_STATIONS) {
+  for (const station of stations) {
     let number = 0
     let figure: ToolItem | undefined
     for (const item of station.items) {
@@ -81,7 +82,7 @@ function build(): OsceQuestion[] {
   return list
 }
 
-export const ALL_QUESTIONS = build()
+export const ALL_QUESTIONS = buildQuestions()
 
 /** Gör om till en nyckel så att bara första förekomsten visas när dubletter döljs */
 export function duplicateKey(q: OsceQuestion) {

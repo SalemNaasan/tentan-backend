@@ -101,10 +101,22 @@ export interface OsceStation {
   items: OsceItem[]
 }
 
-export type OscePeriod = "VT26" | "HT25" | "VT25" | "HT24"
+/** Tentaperiod, t.ex. "VT26" eller "HT25" (nya perioder kan läggas till i admin) */
+export type OscePeriod = string
 
-/** Tentaperioder, senaste först */
+/** Tentaperioderna i originalstationerna, senaste först */
 export const OSCE_PERIODS: OscePeriod[] = ["VT26", "HT25", "VT25", "HT24"]
+
+/** Sorteringsvärde: högre = senare (VT26 > HT25 > VT25) */
+export function periodRank(p: string) {
+  const m = /^(VT|HT)(\d{2})$/.exec(p)
+  return m ? Number(m[2]) * 2 + (m[1] === "HT" ? 1 : 0) : -1
+}
+
+/** Perioderna som förekommer bland stationerna, senaste först */
+export function periodsOf(stations: { exam: { period: string } }[]): OscePeriod[] {
+  return [...new Set(stations.map(s => s.exam.period))].sort((a, b) => periodRank(b) - periodRank(a))
+}
 
 export interface ExamRef {
   period: OscePeriod

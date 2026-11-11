@@ -6,8 +6,9 @@ import { ArrowRight, ListChecks, Stethoscope, Timer, Dumbbell, HeartPulse, Activ
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
-import { ALL_STATIONS, getSittings } from "@/lib/osce/stations"
-import { OSCE_PERIODS, OSCE_THEMES, examLabel, type ExamRef, type OscePeriod, type OsceStation, type OsceTheme } from "@/lib/osce/types"
+import { getSittings } from "@/lib/osce/stations"
+import { useOsceStations } from "@/lib/osce/use-osce-data"
+import { OSCE_THEMES, periodsOf, examLabel, type ExamRef, type OscePeriod, type OsceStation, type OsceTheme } from "@/lib/osce/types"
 
 const THEME_ICON: Record<OsceTheme, typeof Activity> = {
   CREN: Activity,
@@ -23,6 +24,7 @@ const INTERACTIVE = new Set(["auscultation", "electrodes", "bloodpressure", "cpr
 const FILTER_KEY = "tentan_osce_filters"
 
 export function OsceHub() {
+  const { stations: ALL_STATIONS } = useOsceStations()
   const [theme, setTheme] = useState<OsceTheme | "all">("all")
   const [skill, setSkill] = useState<string | null>(null)
   const [period, setPeriod] = useState<OscePeriod | "all">("all")
@@ -59,13 +61,13 @@ export function OsceHub() {
   const skills = useMemo(() => {
     const list = ALL_STATIONS.filter(s => theme === "all" || s.theme === theme).flatMap(s => s.skills)
     return [...new Set(list)].sort((a, b) => a.localeCompare(b, "sv"))
-  }, [theme])
+  }, [theme, ALL_STATIONS])
 
   const stations = ALL_STATIONS.filter(
     s => (period === "all" || s.exam.period === period) && (examType === "all" || s.exam.type === examType) && (session === "all" || s.exam.session === session) && (theme === "all" || s.theme === theme) && (!skill || s.skills.includes(skill)),
   )
 
-  const sittings = useMemo(getSittings, [])
+  const sittings = useMemo(() => getSittings(ALL_STATIONS), [ALL_STATIONS])
 
   // Stationerna är redan sorterade; här grupperas de per tenta
   const groups = stations.reduce<{ label: string; items: OsceStation[] }[]>((list, s) => {
@@ -142,7 +144,7 @@ export function OsceHub() {
           <p className="text-sm text-muted-foreground">Välj en tenta och gör exakt de fyra stationer som kom då, med klocka och resultat.</p>
         </div>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {OSCE_PERIODS.map(p => (
+          {periodsOf(ALL_STATIONS).map(p => (
             <div key={p} className="space-y-2 rounded-xl border border-border bg-card p-3">
               <h3 className="text-lg font-bold">{p}</h3>
               {sittings
@@ -178,7 +180,7 @@ export function OsceHub() {
           <Button size="sm" variant={period === "all" ? "default" : "outline"} onClick={() => setPeriod("all")}>
             Alla tentor
           </Button>
-          {OSCE_PERIODS.map(p => (
+          {periodsOf(ALL_STATIONS).map(p => (
             <Button key={p} size="sm" variant={period === p ? "default" : "outline"} onClick={() => setPeriod(p)}>
               {p}
             </Button>

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { cn } from "@/lib/utils"
 import { getStation } from "@/lib/osce/stations"
+import { useOsceStations } from "@/lib/osce/use-osce-data"
 import { stationScore } from "@/lib/osce/scoring"
 import { playWhistle, getAudioContext } from "@/lib/osce/audio"
 import { examLabel, type ItemResponse, type StationResponses } from "@/lib/osce/types"
@@ -16,7 +17,8 @@ import { formatClock, useStationTimer } from "./use-station-timer"
 const fmt = (n: number) => n.toLocaleString("sv-SE", { maximumFractionDigits: 1 })
 
 export function PracticeStation({ id }: { id: string }) {
-  const station = getStation(id)
+  const { stations, ready } = useOsceStations()
+  const station = getStation(id, stations)
   const [responses, setResponses] = useState<StationResponses>({})
   const [attempt, setAttempt] = useState(0)
   const [timerOn, setTimerOn] = useState(false)
@@ -37,6 +39,8 @@ export function PracticeStation({ id }: { id: string }) {
   })
 
   if (!station) {
+    // En station som lagts till i admin finns först när ändringarna hämtats
+    if (!ready) return <div className="h-64 animate-pulse rounded-xl bg-muted" />
     return (
       <div className="py-20 text-center">
         <p className="text-muted-foreground">Stationen finns inte.</p>

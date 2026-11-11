@@ -16,10 +16,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
-import { Upload, FileText, Check, X, Edit2, Loader2, AlertCircle, Lock, Trash2, List, MessageSquare, Eye, EyeOff, Search, ArrowUpDown, Plus, PlusCircle, Image as ImageIcon, BookOpen, Bell, Briefcase, Copy, AlertTriangle } from "lucide-react"
+import { Upload, FileText, Check, X, Edit2, Loader2, AlertCircle, Lock, Trash2, List, MessageSquare, Eye, EyeOff, Search, ArrowUpDown, Plus, PlusCircle, Image as ImageIcon, BookOpen, Bell, Briefcase, Copy, AlertTriangle, Stethoscope } from "lucide-react"
 import type { Semester, ExamType, SubjectArea, ExamPeriod, InteractionType, Question, QuestionFeedback, FeedbackStatus, PPLCase } from "@/lib/types"
 import { EXAM_PERIODS } from "@/lib/types"
 import { ImageUpload } from "@/components/admin/image-upload"
+import { OsceEditor } from "@/components/admin/osce-editor"
 // import { mockQuestions } from "@/lib/mock-data"
 // import {
 //   getCustomQuestions,
@@ -1027,7 +1028,7 @@ export default function AdminPage() {
           </div>
 
           <Tabs defaultValue="upload" className="space-y-6">
-            <TabsList>
+            <TabsList className="h-auto flex-wrap">
               <TabsTrigger value="upload">Ladda upp frågor</TabsTrigger>
               <TabsTrigger value="review" disabled={extractedQuestions.length === 0}>
                 Granska frågor
@@ -1064,6 +1065,12 @@ export default function AdminPage() {
                 <TabsTrigger value="news" className="gap-2">
                   <Bell className="h-4 w-4" />
                   Nyheter
+                </TabsTrigger>
+              )}
+              {adminRole === "super" && (
+                <TabsTrigger value="osce" className="gap-2">
+                  <Stethoscope className="h-4 w-4" />
+                  OSCE
                 </TabsTrigger>
               )}
               {adminRole === "super" && (
@@ -1857,6 +1864,12 @@ export default function AdminPage() {
             </TabsContent>
 
             {/* PPL Cases Tab */}
+            {adminRole === "super" && (
+              <TabsContent value="osce" className="space-y-6">
+                <OsceEditor />
+              </TabsContent>
+            )}
+
             <TabsContent value="cases" className="space-y-6">
               <div className="flex justify-between items-center bg-card p-4 rounded-lg border border-border">
                 <div>

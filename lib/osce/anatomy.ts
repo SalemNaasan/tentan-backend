@@ -19,6 +19,8 @@ export type Point = {
   y: number
   /** Exakt läge på 3D-kroppen när punkten kommer från ett klick i 3D-vyn */
   spot?: { pos: number[]; normal: number[] }
+  /** Punkten ligger på ryggen (samma x/y, men baksidan av kroppen) */
+  back?: boolean
 }
 
 export const dist = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y)
@@ -65,11 +67,84 @@ export const LUNG_POINTS: (Landmark & { lobe: "upper" | "middle" | "lower"; side
   { id: "base-sin", label: "Lunggräns vänster basalt – mittaxillarlinjen", short: "Bas sin", x: MIDLINE + LINES.mal - 6, y: icsY(8) + 10, lobe: "lower", side: "sin", base: true },
 ]
 
+/** Auskultation bakifrån (patienten vänd): överloberna paravertebralt, underloberna nedom scapulaspetsen */
+export const LUNG_POINTS_BACK: (Landmark & { lobe: "upper" | "lower"; side: "dx" | "sin"; base?: boolean; back: true })[] = [
+  { id: "p-ul-dx", label: "Överlob höger bakifrån – paravertebralt Th3", short: "ÖL dx", x: MIDLINE - 52, y: icsY(2), lobe: "upper", side: "dx", back: true },
+  { id: "p-ul-sin", label: "Överlob vänster bakifrån – paravertebralt Th3", short: "ÖL sin", x: MIDLINE + 52, y: icsY(2), lobe: "upper", side: "sin", back: true },
+  { id: "p-ll-dx", label: "Underlob höger bakifrån – nedom scapulaspetsen", short: "UL dx", x: MIDLINE - 72, y: icsY(7), lobe: "lower", side: "dx", back: true },
+  { id: "p-ll-sin", label: "Underlob vänster bakifrån – nedom scapulaspetsen", short: "UL sin", x: MIDLINE + 72, y: icsY(7), lobe: "lower", side: "sin", back: true },
+  { id: "p-base-dx", label: "Lunggräns höger bakifrån – basalt", short: "Bas dx", x: MIDLINE - 78, y: 318, lobe: "lower", side: "dx", base: true, back: true },
+  { id: "p-base-sin", label: "Lunggräns vänster bakifrån – basalt", short: "Bas sin", x: MIDLINE + 78, y: 318, lobe: "lower", side: "sin", base: true, back: true },
+]
+
+/** Punkterna bakifrån räknas som samma lob/lunggräns som motsvarande punkt framifrån */
+export const LUNG_POINT_ALIAS: Record<string, string> = {
+  "p-ul-dx": "ul-dx", "p-ul-sin": "ul-sin",
+  "p-ll-dx": "ll-dx", "p-ll-sin": "ll-sin",
+  "p-base-dx": "base-dx", "p-base-sin": "base-sin",
+}
+
 export const LUNG_PAIR: Record<string, string> = {
   "ul-dx": "ul-sin", "ul-sin": "ul-dx",
   "ml-dx": "li-sin", "li-sin": "ml-dx",
   "ll-dx": "ll-sin", "ll-sin": "ll-dx",
   "base-dx": "base-sin", "base-sin": "base-dx",
+  "p-ul-dx": "p-ul-sin", "p-ul-sin": "p-ul-dx",
+  "p-ll-dx": "p-ll-sin", "p-ll-sin": "p-ll-dx",
+  "p-base-dx": "p-base-sin", "p-base-sin": "p-base-dx",
+}
+
+const clamp01 = (v: number) => Math.max(0, Math.min(1, v))
+
+/**
+ * Vilket andningsljud som hörs där stetoskopet ligger, utifrån vad som finns under huden:
+ * trakea på halsen, huvudbronkerna bakom manubrium och mellan skulderbladen,
+ * lungvävnad ut mot lunggränserna, lever/buk nedanför. Framtill når lungan ca 6:e revbenet
+ * i MCL och 8:e i mittaxillarlinjen, baktill ner till ca Th10.
+ */
+export function breathSoundAt(p: Point): { type: "tracheal" | "bronchial" | "bronchovesicular" | "vesicular" | "none"; gain: number; heart: number; area: string } {
+  const dx = p.x - MIDLINE
+  const adx = Math.abs(dx)
+  const y = p.y
+
+  if (y < 100) {
+    if (adx < 28) return { type: "tracheal", gain: 1, heart: 0, area: p.back ? "Nacken" : "Trakea (halsen)" }
+    if (y > 78 && adx < 75) return { type: "vesicular", gain: 0.55, heart: 0, area: "Lungtoppen ovanför nyckelbenet" }
+    return { type: "none", gain: 0.4, heart: 0, area: "Utanför lungan" }
+  }
+
+  if (!p.back) {
+    if (adx < 24 && y < ribY(2) + 6) return { type: "bronchial", gain: 1, heart: 0.15, area: "Manubrium sterni" }
+    if (adx < 55 && y < icsY(2) + 12) return { type: "bronchovesicular", gain: 0.9, heart: 0.2, area: "Parasternalt I1–I2" }
+    // Lungans nedre gräns framtill: 6:e revbenet i MCL, 8:e i mittaxillarlinjen
+    const border = ribY(6) + (ribY(8) - ribY(6)) * clamp01((adx - 40) / (LINES.mal - 40))
+    if (y > border + 14) return { type: "none", gain: 0.35, heart: 0.05, area: dx < 0 ? "Över levern – ingen lunga" : "Över magsäcken – ingen lunga" }
+    // Hjärtat ligger mot bröstväggen till vänster om sternum (I3–I6): lungljudet dämpas, hjärtat hörs
+    const overHeart = dx > 0 && dx < LINES.mcl + 6 && y > icsY(3) && y < ribY(6) + 10
+    if (adx < 18) return { type: "bronchovesicular", gain: 0.6, heart: 0.5, area: "Över sternum" }
+    const nearBorder = clamp01((y - (border - 25)) / 40)
+    return {
+      type: "vesicular",
+      gain: (overHeart ? 0.55 : 1) * (1 - 0.45 * nearBorder),
+      heart: overHeart ? 0.75 : dx > 0 ? 0.25 : 0.12,
+      area: overHeart ? "Över hjärtat (lungan täcker delvis)" : "Lungfältet",
+    }
+  }
+
+  // Baksidan
+  if (adx < 18 && y < icsY(3)) return { type: "bronchial", gain: 0.8, heart: 0.05, area: "Över bröstryggen (Th1–Th3)" }
+  if (adx < 55 && y > ribY(1) && y < icsY(5)) return { type: "bronchovesicular", gain: 0.85, heart: 0.1, area: "Mellan skulderbladen" }
+  // Lungans nedre gräns baktill: ca Th10, något högre lateralt
+  const border = 340 - 10 * clamp01((adx - 60) / 60)
+  if (y > border + 12) return { type: "none", gain: 0.3, heart: 0, area: "Nedanför lunggränsen" }
+  const overScapula = adx > 45 && adx < 118 && y > ribY(1) && y < ribY(7)
+  const nearBorder = clamp01((y - (border - 25)) / 40)
+  return {
+    type: "vesicular",
+    gain: (overScapula ? 0.6 : 1) * (1 - 0.4 * nearBorder),
+    heart: 0.04,
+    area: overScapula ? "Över skulderbladet (dämpat)" : "Lungfältet bakifrån",
+  }
 }
 
 /** Bröstelektrodernas korrekta lägen */

@@ -6,7 +6,7 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber"
 import { ContactShadows, Html, OrbitControls, RoundedBox } from "@react-three/drei"
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js"
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib"
-import { Move3d, Focus, Eye } from "lucide-react"
+import { Move3d, Focus, Eye, RefreshCw } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { LINES, MIDLINE, icsY, type Point } from "@/lib/osce/anatomy"
 import { DEPTH, PatientBody, XrayAnatomy, torsoRadius } from "./patient-model"
@@ -21,6 +21,8 @@ import type { PatientMarker, PatientViewProps } from "./markers"
 const MATTRESS_TOP = 0
 const LIE_HEIGHT = MATTRESS_TOP + 0.84
 const PATIENT_ROT = new THREE.Euler(-Math.PI / 2, 0, 0)
+/** I magläge vilar bröstkorgen (z ≈ 1,25 framåt) på britsen */
+const PRONE_HEIGHT = MATTRESS_TOP + 1.27
 
 const VIEWS = {
   overview: { pos: new THREE.Vector3(-17, 19, 7.5), target: new THREE.Vector3(0, 1, 2.4) },
@@ -445,6 +447,28 @@ function BridgeWriter({ bridge }: { bridge: MutableRefObject<Bridge> }) {
   return null
 }
 
+/** Patienten rullar över på mage och tillbaka; ryggen vänds då uppåt mot kameran */
+function PatientPose({ prone, children }: { prone: boolean; children: React.ReactNode }) {
+  const group = useRef<THREE.Group>(null)
+  const t = useRef(prone ? 1 : 0)
+  useFrame((_, dt) => {
+    const g = group.current
+    if (!g) return
+    const goal = prone ? 1 : 0
+    t.current += Math.sign(goal - t.current) * Math.min(Math.abs(goal - t.current), dt * 1.1)
+    const k = t.current * t.current * (3 - 2 * t.current)
+    g.rotation.set(-Math.PI / 2, Math.PI * k, 0)
+    // Lyft under rullningen så att axlarna inte går genom britsen
+    g.position.set(0, LIE_HEIGHT + (PRONE_HEIGHT - LIE_HEIGHT) * k + Math.sin(Math.PI * k) * 0.75, 0)
+  })
+  return (
+    // Läget sätts i useFrame (inte som props), annars hoppar patienten direkt till slutläget
+    <group ref={group} position={[0, LIE_HEIGHT, 0]} rotation={PATIENT_ROT}>
+      {children}
+    </group>
+  )
+}
+
 function CameraRig({ view, controls }: { view: ViewId; controls: MutableRefObject<OrbitControlsImpl | null> }) {
   const { camera } = useThree()
   const animating = useRef(true)
@@ -470,7 +494,7 @@ function CameraRig({ view, controls }: { view: ViewId; controls: MutableRefObjec
   return null
 }
 
-export default function PatientScene({ xray = false, markers = [], onPoint, guides = false, focus = "chest", ariaLabel, className, highlight }: PatientViewProps) {
+export default function PatientScene({ xray = false, markers = [], onPoint, guides = false, focus = "chest", ariaLabel, className, highlight, prone = false, onTurn }: PatientViewProps) {
   const bridge = useRef<Bridge>({ camera: null, body: null, size: { width: 1, height: 1 } })
   const bodyRef = useRef<THREE.Group>(null)
   const controls = useRef<OrbitControlsImpl | null>(null)
@@ -541,7 +565,7 @@ export default function PatientScene({ xray = false, markers = [], onPoint, guid
         <Lighting />
         <ExamTable xray={xray} drape={!realSurface} />
         <SurfaceCtx.Provider value={surface}>
-          <group position={[0, LIE_HEIGHT, 0]} rotation={PATIENT_ROT}>
+          <PatientPose prone={prone}>
             <ModelBoundary fallback={<PatientBody ref={bodyRef} xray={xray} />}>
               <Suspense fallback={null}>
                 <PatientGLB ref={bodyRef} xray={xray} onSurface={onModelSurface} />
@@ -552,7 +576,7 @@ export default function PatientScene({ xray = false, markers = [], onPoint, guid
             {markers.map((m, i) => (
               <Marker key={`${m.kind}-${i}`} m={m} />
             ))}
-          </group>
+          </PatientPose>
         </SurfaceCtx.Provider>
         <ContactShadows position={[0, MATTRESS_TOP + 0.05, 0]} opacity={0.35} scale={14} blur={2.4} far={2} />
         <OrbitControls
@@ -582,7 +606,17 @@ export default function PatientScene({ xray = false, markers = [], onPoint, guid
           3D-modell: "Male base" av Артур Мигранов, CC BY 3.0
         </a>
       )}
-      <div className="absolute bottom-2 right-2 flex gap-1">
+      {onTurn && (
+        <button
+          type="button"
+          onPointerDownCapture={e => e.stopPropagation()}
+          onClick={() => onTurn(!prone)}
+          className="absolute right-2 top-10 flex items-center gap-1.5 rounded-md bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-900 shadow-md transition-colors hover:bg-slate-100"
+        >
+          <RefreshCw className="h-3.5 w-3.5" /> {prone ? "Vänd tillbaka (framifrån)" : "Vänd patienten (lyssna bakifrån)"}
+        </button>
+      )}
+      <div className="absolute bottom-2 right-2 flex flex-wrap justify-end gap-1">
         {(
           [
             ["overview", "Översikt", Eye],

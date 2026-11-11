@@ -118,7 +118,7 @@ export function breathPhase(t: number, p: BreathPattern) {
 export type ChestPiece = "membrane" | "bell"
 
 /** Skapar en kedja som efterliknar stetoskopets frekvensgång */
-function createChestPiece(ac: AudioContext) {
+function createChestPiece(ac: AudioContext, membraneLp = 900) {
   const input = ac.createGain()
   const hp = ac.createBiquadFilter()
   hp.type = "highpass"
@@ -137,7 +137,7 @@ function createChestPiece(ac: AudioContext) {
     } else {
       // Membranet filtrerar bort de lägsta frekvenserna och framhäver S1/S2
       hp.frequency.setTargetAtTime(90, now, 0.05)
-      lp.frequency.setTargetAtTime(900, now, 0.05)
+      lp.frequency.setTargetAtTime(membraneLp, now, 0.05)
       out.gain.setTargetAtTime(1.5, now, 0.05)
     }
   }
@@ -258,17 +258,65 @@ export class HeartSoundEngine {
 
 export type LungFinding = "normal" | "obstructive"
 
+/**
+ * Andningsljudets karaktär beror på var stetoskopet ligger:
+ * trakealt (halsen) – högt, skarpt, in- och utandning lika långa med paus emellan;
+ * bronkiellt (manubrium, övre bröstryggen) – högt, högfrekvent, utandningen längre och starkare;
+ * bronkovesikulärt (I1–I2 parasternalt, mellan skulderbladen) – mellanting, in ≈ ut;
+ * vesikulärt (lungfälten) – mjukt, lågfrekvent prasslande, inandningen hörs hela vägen och
+ * utandningen bara svagt i början; ingen lunga under (lever, buk) – nästan tyst.
+ */
+export type BreathSoundType = "tracheal" | "bronchial" | "bronchovesicular" | "vesicular" | "none"
+
+interface BreathSoundProfile {
+  hp: number
+  lp: number
+  insp: number
+  exp: number
+  /** Hur stor del av utandningen som hörs (vesikulärt: bara början) */
+  expFade: number
+  /** Tyst paus mellan in- och utandning (andel av utandningen) */
+  pause: number
+  /** Hur tydligt ronkierna hörs här vid obstruktivitet */
+  wheeze: number
+}
+
+const BREATH_SOUNDS: Record<BreathSoundType, BreathSoundProfile> = {
+  tracheal: { hp: 230, lp: 2100, insp: 0.95, exp: 0.95, expFade: 0.8, pause: 0.12, wheeze: 1 },
+  bronchial: { hp: 200, lp: 1500, insp: 0.5, exp: 0.75, expFade: 0.85, pause: 0.12, wheeze: 1 },
+  bronchovesicular: { hp: 140, lp: 850, insp: 0.5, exp: 0.42, expFade: 0.7, pause: 0, wheeze: 0.9 },
+  vesicular: { hp: 100, lp: 430, insp: 0.55, exp: 0.16, expFade: 0.33, pause: 0, wheeze: 0.7 },
+  none: { hp: 90, lp: 240, insp: 0.05, exp: 0.02, expFade: 0.3, pause: 0, wheeze: 0.12 },
+}
+
+export interface BreathListenPoint {
+  type: BreathSoundType
+  /** 0–1: dämpning av muskler/skulderblad eller avstånd till lungan */
+  gain: number
+  /** 0–1: hur tydligt hjärtat hörs genom bröstkorgen här */
+  heart: number
+}
+
 export class LungSoundEngine {
   private ac: AudioContext
   private piece: ReturnType<typeof createChestPiece>
   readonly analyser: AnalyserNode
   private noise: AudioBufferSourceNode
+  private hp: BiquadFilterNode
+  private lp: BiquadFilterNode
+  private lp2: BiquadFilterNode
   private breathGain: GainNode
   private wheezeGain: GainNode
   private wheezeOscs: OscillatorNode[] = []
+  private extraOscs: OscillatorNode[] = []
+  private heartOut: GainNode
   private timer: number | null = null
   private startTime = 0
   private contact = 0
+  private point: BreathListenPoint = { type: "vesicular", gain: 1, heart: 0.1 }
+  private cycle = -1
+  private depth = 1
+  private nextBeat = 0
   finding: LungFinding
   breath: BreathPattern
 
@@ -276,40 +324,76 @@ export class LungSoundEngine {
     this.ac = getAudioContext()
     this.finding = finding
     this.breath = finding === "obstructive" ? OBSTRUCTIVE_BREATH : NORMAL_BREATH
-    this.piece = createChestPiece(this.ac)
+    // Membranet släpper igenom högre frekvenser än för hjärtljud, annars försvinner det bronkiella ljudet
+    this.piece = createChestPiece(this.ac, 1700)
     this.analyser = this.ac.createAnalyser()
     this.analyser.fftSize = 2048
     this.piece.out.connect(this.analyser).connect(this.ac.destination)
     this.piece.set("membrane")
 
-    // Vesikulärt andningsljud: brus genom bandpass, styrt av andningscykeln
+    // Andningsljud: brus genom filter som följer läget på bröstkorgen
     this.noise = this.ac.createBufferSource()
     this.noise.buffer = getNoise(this.ac)
     this.noise.loop = true
-    const bp = this.ac.createBiquadFilter()
-    bp.type = "bandpass"
-    bp.frequency.value = 320
-    bp.Q.value = 0.7
-    const lp = this.ac.createBiquadFilter()
-    lp.type = "lowpass"
-    lp.frequency.value = 700
+    this.hp = this.ac.createBiquadFilter()
+    this.hp.type = "highpass"
+    this.lp = this.ac.createBiquadFilter()
+    this.lp.type = "lowpass"
+    this.lp2 = this.ac.createBiquadFilter()
+    this.lp2.type = "lowpass"
     this.breathGain = this.ac.createGain()
     this.breathGain.gain.value = 0
-    this.noise.connect(bp).connect(lp).connect(this.breathGain).connect(this.piece.input)
+    this.noise.connect(this.hp).connect(this.lp).connect(this.lp2).connect(this.breathGain).connect(this.piece.input)
+    this.applyFilters(true)
 
-    // Ronki: musikaliska, pipande toner under exspirationen
+    // Ronki: pipande, musikaliska toner (trånga luftvägar) och ett lågt snarkande inslag
     this.wheezeGain = this.ac.createGain()
     this.wheezeGain.gain.value = 0
     this.wheezeGain.connect(this.piece.input)
-    for (const f of [410, 560, 690]) {
+    const vibrato = this.ac.createOscillator()
+    vibrato.frequency.value = 5.5
+    const vibratoDepth = this.ac.createGain()
+    vibratoDepth.gain.value = 6
+    vibrato.connect(vibratoDepth)
+    const tones: [number, number][] = [
+      [420, 0.16],
+      [575, 0.12],
+      [710, 0.08],
+    ]
+    for (const [f, g] of tones) {
       const o = this.ac.createOscillator()
       o.type = "sine"
       o.frequency.value = f
-      const g = this.ac.createGain()
-      g.gain.value = 0.18
-      o.connect(g).connect(this.wheezeGain)
+      vibratoDepth.connect(o.frequency)
+      const gain = this.ac.createGain()
+      gain.gain.value = g
+      o.connect(gain).connect(this.wheezeGain)
       this.wheezeOscs.push(o)
     }
+    const rhonchus = this.ac.createOscillator()
+    rhonchus.type = "sawtooth"
+    rhonchus.frequency.value = 150
+    const rhLp = this.ac.createBiquadFilter()
+    rhLp.type = "lowpass"
+    rhLp.frequency.value = 380
+    const rhGain = this.ac.createGain()
+    rhGain.gain.value = 0.05
+    rhonchus.connect(rhLp).connect(rhGain).connect(this.wheezeGain)
+    this.extraOscs.push(vibrato, rhonchus)
+
+    // Hjärtat hörs svagt genom bröstkorgen, tydligast till vänster om sternum
+    this.heartOut = this.ac.createGain()
+    this.heartOut.gain.value = 0
+    this.heartOut.connect(this.piece.input)
+  }
+
+  private applyFilters(immediate = false) {
+    const prof = BREATH_SOUNDS[this.point.type]
+    const now = this.ac.currentTime
+    const tc = immediate ? 0.001 : 0.08
+    this.hp.frequency.setTargetAtTime(prof.hp, now, tc)
+    this.lp.frequency.setTargetAtTime(prof.lp, now, tc)
+    this.lp2.frequency.setTargetAtTime(prof.lp * 1.4, now, tc)
   }
 
   setChestPiece(piece: ChestPiece) {
@@ -320,6 +404,13 @@ export class LungSoundEngine {
     this.contact = contact
   }
 
+  /** Var stetoskopet ligger: avgör vilket andningsljud som hörs */
+  setPoint(point: BreathListenPoint) {
+    const changed = point.type !== this.point.type
+    this.point = point
+    if (changed) this.applyFilters()
+  }
+
   elapsed() {
     return this.ac.currentTime - this.startTime
   }
@@ -327,23 +418,54 @@ export class LungSoundEngine {
   start() {
     if (this.timer !== null) return
     this.startTime = this.ac.currentTime
+    this.nextBeat = this.startTime + 0.3
     this.noise.start()
     this.wheezeOscs.forEach(o => o.start())
+    this.extraOscs.forEach(o => o.start())
     this.timer = window.setInterval(() => this.tick(), 30)
+  }
+
+  private envelope(inhaling: boolean, progress: number, prof: BreathSoundProfile) {
+    if (inhaling) {
+      // Inandningen hörs genom hela fasen och tilltar något mot slutet
+      return prof.insp * Math.pow(Math.sin(Math.PI * Math.min(1, progress)), 0.7) * (0.8 + 0.2 * progress)
+    }
+    if (progress < prof.pause) return 0
+    const q = (progress - prof.pause) / (1 - prof.pause)
+    const obstructive = this.finding === "obstructive"
+    // Vid obstruktivitet hörs den förlängda utandningen hela vägen
+    const fade = obstructive ? 1 : prof.expFade
+    if (q > fade) return 0
+    const level = obstructive ? Math.max(prof.exp * 1.3, prof.insp * 0.6) : prof.exp
+    if (fade < 0.5) return level * Math.min(1, q * 12) * Math.pow(1 - q / fade, 1.4)
+    return level * Math.pow(Math.sin(Math.PI * Math.min(1, q / fade)), 0.8)
   }
 
   private tick() {
     const now = this.ac.currentTime
-    const { inhaling, progress } = breathPhase(now - this.startTime, this.breath)
-    // Inandning hörs tydligt genom hela fasen, utandningen svagare och kortare (normalt)
-    const shape = Math.sin(Math.PI * Math.min(1, progress))
-    let level = inhaling ? 0.55 * shape : 0.22 * shape * (this.finding === "obstructive" ? 1.2 : 1)
-    if (!inhaling && this.finding === "normal" && progress > 0.45) level *= 0.2
-    this.breathGain.gain.setTargetAtTime(level * this.contact, now, 0.03)
+    const t = now - this.startTime
+    const { inhaling, progress, cycle } = breathPhase(t, this.breath)
+    // Varje andetag är lite olika djupt
+    const n = Math.floor(t / cycle)
+    if (n !== this.cycle) {
+      this.cycle = n
+      this.depth = 0.85 + Math.random() * 0.25
+    }
+    const prof = BREATH_SOUNDS[this.point.type]
+    const level = this.envelope(inhaling, progress, prof) * this.depth * this.point.gain
+    this.breathGain.gain.setTargetAtTime(level * this.contact, now, 0.035)
 
-    const wheeze = this.finding === "obstructive" && !inhaling ? 0.5 * Math.sin(Math.PI * progress) : 0
-    this.wheezeGain.gain.setTargetAtTime(wheeze * this.contact, now, 0.04)
-    this.wheezeOscs.forEach((o, i) => o.frequency.setTargetAtTime([410, 560, 690][i] * (1 - 0.06 * progress), now, 0.1))
+    const wheeze = this.finding === "obstructive" && !inhaling ? Math.sin(Math.PI * Math.min(1, progress * 1.1)) * prof.wheeze : 0
+    this.wheezeGain.gain.setTargetAtTime(wheeze * this.contact, now, 0.05)
+    this.wheezeOscs.forEach((o, i) => o.frequency.setTargetAtTime([420, 575, 710][i] * (1 - 0.07 * progress), now, 0.1))
+
+    // Svaga hjärtslag (ca 72/min) i bakgrunden
+    this.heartOut.gain.setTargetAtTime(this.point.heart * this.contact, now, 0.05)
+    while (this.nextBeat < now + 0.15) {
+      thump(this.ac, this.heartOut, this.nextBeat, { freq: 52, duration: 0.11, gain: 0.5, noise: 0.15 })
+      thump(this.ac, this.heartOut, this.nextBeat + 0.31, { freq: 68, duration: 0.08, gain: 0.4, noise: 0.15 })
+      this.nextBeat += 60 / 72
+    }
   }
 
   dispose() {
@@ -352,6 +474,7 @@ export class LungSoundEngine {
     try {
       this.noise.stop()
       this.wheezeOscs.forEach(o => o.stop())
+      this.extraOscs.forEach(o => o.stop())
     } catch {
       // ej startad
     }

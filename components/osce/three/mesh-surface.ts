@@ -57,6 +57,8 @@ export class MeshSurface {
       x: MIDLINE + spot.pos.x * 100,
       y: 300 - spot.pos.y * 100,
       spot: { pos: spot.pos.toArray(), normal: spot.normal.toArray() },
+      // Ytan vetter bakåt: klicket är på ryggen
+      back: spot.normal.z < -0.2,
     }
   }
 
@@ -68,9 +70,9 @@ export class MeshSurface {
   at(p: Point, radius = 0): SurfaceSpot {
     const base = p.spot
       ? { pos: new THREE.Vector3().fromArray(p.spot.pos), normal: new THREE.Vector3().fromArray(p.spot.normal) }
-      : (this.cast(new THREE.Vector3((p.x - MIDLINE) / 100, (300 - p.y) / 100, 6), new THREE.Vector3(0, 0, -1)) ?? {
+      : (this.cast(new THREE.Vector3((p.x - MIDLINE) / 100, (300 - p.y) / 100, p.back ? -6 : 6), new THREE.Vector3(0, 0, p.back ? 1 : -1)) ?? {
           pos: new THREE.Vector3((p.x - MIDLINE) / 100, (300 - p.y) / 100, 0),
-          normal: new THREE.Vector3(0, 0, 1),
+          normal: new THREE.Vector3(0, 0, p.back ? -1 : 1),
         })
     if (radius <= 0) return base
 

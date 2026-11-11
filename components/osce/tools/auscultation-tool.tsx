@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Hand, Stethoscope, ScanLine, Volume2, Wind, Grid3x3 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { HEART_POINTS, HEART_PROFILE, IKTUS, LUNG_PAIR, LUNG_POINTS, MIDLINE, dist, icsY, type Point } from "@/lib/osce/anatomy"
+import { HEART_POINTS, HEART_PROFILE, IKTUS, LUNG_PAIR, LUNG_POINTS, LUNG_POINTS_BACK, LUNG_POINT_ALIAS, MIDLINE, breathSoundAt, dist, icsY, type Point } from "@/lib/osce/anatomy"
 import { HeartSoundEngine, LungSoundEngine, breathPhase, type ChestPiece } from "@/lib/osce/audio"
 import { PatientView, type PatientMarker } from "../patient-view"
 import { Waveform } from "./waveform"
@@ -13,6 +13,14 @@ import type { ToolProps } from "./tool-props"
 type Instrument = "hand" | "stethoscope"
 
 const HEART_CENTER: Point = { x: MIDLINE + 20, y: icsY(4) }
+
+const SOUND_LABEL = {
+  tracheal: "trakealt andningsljud",
+  bronchial: "bronkiellt andningsljud",
+  bronchovesicular: "bronkovesikulärt andningsljud",
+  vesicular: "vesikulärt andningsljud",
+  none: "inget andningsljud – ingen lunga under",
+} as const
 const CORE_HEART_POINTS = ["aorta", "pulm", "tric", "mitral"]
 
 export function AuscultationTool({ item, achieved, onAchieve, exam, locked }: ToolProps) {
@@ -25,6 +33,7 @@ export function AuscultationTool({ item, achieved, onAchieve, exam, locked }: To
   const [message, setMessage] = useState<string>(mode === "heart" ? "Börja med att palpera: välj handen och tryck på patienten." : "Placera stetoskopet på bröstkorgen.")
   const [inhaling, setInhaling] = useState(false)
   const [visited, setVisited] = useState<string[]>([])
+  const [prone, setProne] = useState(false)
 
   const heartRef = useRef<HeartSoundEngine | null>(null)
   const lungRef = useRef<LungSoundEngine | null>(null)
@@ -72,9 +81,11 @@ export function AuscultationTool({ item, achieved, onAchieve, exam, locked }: To
     if (mode !== "lung") return
     const t = track.current
     const ids: string[] = []
-    if (["ul-dx", "ul-sin", "ml-dx", "li-sin", "ll-dx", "ll-sin"].every(p => visited.includes(p))) ids.push("lung-all-lobes")
+    // Över- och underlober och lunggränser räknas både framifrån och bakifrån
+    const heard = new Set(visited.map(id => LUNG_POINT_ALIAS[id] ?? id))
+    if (["ul-dx", "ul-sin", "ml-dx", "li-sin", "ll-dx", "ll-sin"].every(p => heard.has(p))) ids.push("lung-all-lobes")
     if (t.compared >= 2) ids.push("lung-compare")
-    if (visited.includes("base-dx") && visited.includes("base-sin")) ids.push("lung-bases")
+    if (heard.has("base-dx") && heard.has("base-sin")) ids.push("lung-bases")
     if (ids.length) report(ids)
   }, [visited, mode, report])
 
@@ -196,19 +207,23 @@ export function AuscultationTool({ item, achieved, onAchieve, exam, locked }: To
         // Utvärdera hörlurar/klocka direkt
         if (t.usedPieces.size === 2) report(["bell-and-membrane"])
       } else {
-        const nearest = LUNG_POINTS.map(l => ({ l, d: dist(l, p) })).sort((a, b) => a.d - b.d)[0]
+        // Ljudet bestäms av vad som ligger under stetoskopet (trakea, bronker, lunga, lever …)
+        const sound = breathSoundAt(p)
         const engine = lungRef.current
-        if (nearest.d < 24) {
-          engine?.setContact(1)
+        engine?.setPoint(sound)
+        engine?.setContact(1)
+        const points = p.back ? LUNG_POINTS_BACK : LUNG_POINTS
+        const nearest = points.map(l => ({ l, d: dist(l, p) })).sort((a, b) => a.d - b.d)[0]
+        const description = `${sound.area}: ${SOUND_LABEL[sound.type]}`
+        if (nearest && nearest.d < 24) {
           if (t.currentPoint !== nearest.l.id) {
             t.currentPoint = nearest.l.id
             t.pointSince = engine?.elapsed() ?? 0
           }
-          setMessage(exam ? "Stetoskopet ligger an. Lyssna en hel andningscykel." : `Du lyssnar över: ${nearest.l.label}`)
+          setMessage(exam ? "Stetoskopet ligger an. Lyssna en hel andningscykel." : `${nearest.l.label}. ${description}.`)
         } else {
           t.currentPoint = null
-          engine?.setContact(0.35)
-          setMessage("Andningsljud hörs, men flytta till en standardpunkt.")
+          setMessage(exam ? "Stetoskopet ligger an." : `${description}. (Ingen av standardpunkterna.)`)
         }
       }
     },
@@ -226,7 +241,7 @@ export function AuscultationTool({ item, achieved, onAchieve, exam, locked }: To
     [mode],
   )
 
-  const landmarks = mode === "heart" ? HEART_POINTS : LUNG_POINTS
+  const landmarks = mode === "heart" ? HEART_POINTS : prone ? LUNG_POINTS_BACK : LUNG_POINTS
   const showMarkers = !exam && guides
   const viewMarkers: PatientMarker[] = [
     ...(showMarkers
@@ -243,6 +258,18 @@ export function AuscultationTool({ item, achieved, onAchieve, exam, locked }: To
         markers={viewMarkers}
         onPoint={(p, phase) => phase !== "up" && placeAt(p)}
         ariaLabel="Patient för palpation och auskultation"
+        prone={mode === "lung" && prone}
+        onTurn={
+          mode === "lung"
+            ? next => {
+                setProne(next)
+                setPos(null)
+                lungRef.current?.setContact(0)
+                track.current.currentPoint = null
+                setMessage(next ? "Patienten ligger nu på mage. Lyssna bakifrån: paravertebralt, mellan skulderbladen och basalt." : "Patienten ligger på rygg igen.")
+              }
+            : undefined
+        }
       />
 
       <div className="flex min-w-0 flex-col gap-3">
@@ -292,7 +319,9 @@ export function AuscultationTool({ item, achieved, onAchieve, exam, locked }: To
 
         {!exam && (
           <p className="text-xs leading-relaxed text-muted-foreground">
-            Tips: använd hörlurar. Stetoskopet ljuder så länge det ligger an – dra det mellan punkterna. Lyssna efter hur S2 klyvs vid inandning över I2 sin, och prova klockan över apex.
+            {mode === "heart"
+              ? "Tips: använd hörlurar. Stetoskopet ljuder så länge det ligger an – dra det mellan punkterna. Lyssna efter hur S2 klyvs vid inandning över I2 sin, och prova klockan över apex."
+              : "Tips: använd hörlurar och lyssna en hel andningscykel per punkt. Jämför höger och vänster sida på samma nivå. Lyssna på halsen (trakealt), över sternum (bronkiellt), mellan skulderbladen (bronkovesikulärt) och ute över lungfälten (vesikulärt) – och vänd patienten för att lyssna bakifrån."}
           </p>
         )}
       </div>

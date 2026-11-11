@@ -23,4 +23,8 @@ export interface PatientViewProps {
   ariaLabel?: string
   className?: string
   highlight?: boolean
+  /** Patienten ligger på mage (för att lyssna bakifrån) */
+  prone?: boolean
+  /** Visar knappen "Vänd patienten" i 3D-vyn */
+  onTurn?: (prone: boolean) => void
 }

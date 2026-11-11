@@ -71,7 +71,6 @@ export function AuscultationTool({ item, achieved, onAchieve, exam, locked }: To
     const t = track.current
     const ids: string[] = []
     if (CORE_HEART_POINTS.every(p => visited.includes(p))) ids.push("ausk-4")
-    if (CORE_HEART_POINTS.every(p => (t.beatsPerPoint[p] ?? 0) >= 2)) ids.push("ausk-cycle")
     if (["erb", "carotid-r", "carotid-l"].some(p => visited.includes(p))) ids.push("ausk-extra")
     if (t.usedPieces.size === 2) ids.push("bell-and-membrane")
     if (ids.length) report(ids)
@@ -197,6 +196,8 @@ export function AuscultationTool({ item, achieved, onAchieve, exam, locked }: To
             t.beatsAtPoint = 0
           }
           setMessage(exam ? "Stetoskopet ligger an. Lyssna en hel hjärtcykel." : `Du lyssnar över: ${nearest.h.label}`)
+          // Protokollet: palpation först, sedan avslutar man med auskultation
+          if (t.palpated) report(["ausk-cycle"])
         } else {
           t.currentPoint = null
           const d = dist(HEART_CENTER, p)

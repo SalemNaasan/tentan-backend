@@ -90,7 +90,7 @@ export function FilterSidebar({
   setSelectedCases,
   availableOptions,
 }: FilterSidebarProps) {
-  // If no availableOptions provided (e.g. no semester selected), everything is available
+  // Val utan frågor givet de andra filtren gråas ut. Ett val som redan är ikryssat går alltid att kryssa ur.
   const hasOptions = !!availableOptions
 
   const isTypeAvailable    = (v: string) => !hasOptions || availableOptions!.examTypes.has(v)
@@ -196,7 +196,7 @@ export function FilterSidebar({
         </h3>
         <div className="space-y-2">
           {examTypes.map((type) => {
-            const available = isTypeAvailable(type.value)
+            const available = isTypeAvailable(type.value) || selectedExamTypes.includes(type.value)
             return (
               <div
                 key={type.value}
@@ -247,7 +247,7 @@ export function FilterSidebar({
               {(["VT","HT"] as const).map((half) => {
                 const period = `${half}${year}`
                 const active = selectedPeriods.includes(period)
-                const available = isPeriodAvailable(period)
+                const available = isPeriodAvailable(period) || active
                 return (
                   <button
                     key={period}
@@ -277,7 +277,7 @@ export function FilterSidebar({
         </h3>
         <div className="space-y-2 max-h-64 overflow-y-auto pr-2">
           {subjects.map((subject) => {
-            const available = isSubjectAvailable(subject)
+            const available = isSubjectAvailable(subject) || selectedSubjects.includes(subject)
             return (
               <div
                 key={subject}
@@ -313,7 +313,7 @@ export function FilterSidebar({
         </h3>
         <div className="space-y-2">
           {interactionTypes.map((type) => {
-            const available = isInteractionAvailable(type.value)
+            const available = isInteractionAvailable(type.value) || selectedInteractions.includes(type.value)
             return (
               <div
                 key={type.value}
@@ -360,7 +360,7 @@ export function FilterSidebar({
           </div>
           <div className="grid grid-cols-2 gap-2">
             {defaultCases.map((cName) => {
-              const available = isCaseAvailable(cName)
+              const available = isCaseAvailable(cName) || selectedCases.includes(cName)
               return (
                 <div
                   key={cName}

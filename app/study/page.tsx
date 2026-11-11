@@ -202,19 +202,28 @@ export default function StudyPage() {
     })
   }, [questions, selectedSemesters, selectedExamTypes, selectedSubjects, selectedPeriods, isOnlyBookmarked, bookmarkedIds, selectedInteractions, selectedCases, sortBy, searchQuery])
 
-  // Compute which options actually have questions given the current semester selection
+  // Vilka val som har frågor givet ALLA andra filter (t.ex. gråas Omtenta om HT25 bara har ordinarie).
+  // Varje grupp räknas utan sitt eget filter, så att man fortfarande kan välja flera inom gruppen.
   const availableOptions = useMemo(() => {
-    const base = selectedSemesters.length > 0
-      ? questions.filter(q => !q.isHidden && selectedSemesters.includes(q.semester))
-      : questions.filter(q => !q.isHidden)
+    const caseLabel = (c: string) => (c.toLowerCase().startsWith('fall') ? c : `Fall ${c.toUpperCase()}`)
+    type Facet = "semester" | "examType" | "period" | "subject" | "interaction" | "case"
+    const passes = (q: Question, skip: Facet) =>
+      !q.isHidden &&
+      (skip === "semester" || selectedSemesters.length === 0 || selectedSemesters.includes(q.semester)) &&
+      (skip === "examType" || selectedExamTypes.length === 0 || selectedExamTypes.includes(q.examType)) &&
+      (skip === "period" || selectedPeriods.length === 0 || selectedPeriods.includes(q.examPeriod)) &&
+      (skip === "subject" || selectedSubjects.length === 0 || selectedSubjects.includes(q.subjectArea)) &&
+      (skip === "interaction" || selectedInteractions.length === 0 || selectedInteractions.includes(q.interaction)) &&
+      (skip === "case" || selectedCases.length === 0 || (!!q.caseName && selectedCases.some(c => c.toLowerCase() === caseLabel(q.caseName!).toLowerCase())))
+    const values = <T,>(skip: Facet, pick: (q: Question) => T) => new Set(questions.filter(q => passes(q, skip)).map(pick))
     return {
-      examTypes: new Set(base.map(q => q.examType)),
-      periods:   new Set(base.map(q => q.examPeriod)),
-      subjects:  new Set(base.map(q => q.subjectArea)),
-      interactions: new Set(base.map(q => q.interaction)),
-      cases: new Set(base.map(q => q.caseName ? (q.caseName.toLowerCase().startsWith('fall') ? q.caseName : `Fall ${q.caseName.toUpperCase()}`) : null).filter(Boolean) as string[]),
+      examTypes: values("examType", q => q.examType) as Set<string>,
+      periods: values("period", q => q.examPeriod) as Set<string>,
+      subjects: values("subject", q => q.subjectArea) as Set<string>,
+      interactions: values("interaction", q => q.interaction) as Set<string>,
+      cases: new Set(questions.filter(q => passes(q, "case") && q.caseName).map(q => caseLabel(q.caseName!))),
     }
-  }, [questions, selectedSemesters])
+  }, [questions, selectedSemesters, selectedExamTypes, selectedPeriods, selectedSubjects, selectedInteractions, selectedCases])
 
   const totalPages = Math.ceil(filteredQuestions.length / PAGE_SIZE)
 
@@ -591,7 +600,7 @@ export default function StudyPage() {
                       )}
                     </Button>
                   </SheetTrigger>
-                  <SheetContent side="left" className="w-80 p-6">
+                  <SheetContent side="left" className="w-80 overflow-y-auto p-6">
                     <SheetTitle className="sr-only">Filtrera frågor</SheetTitle>
                     {filterSidebarContent}
                   </SheetContent>

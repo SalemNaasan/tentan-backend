@@ -30,6 +30,9 @@ interface QuestionCardProps {
   isBookmarked?: boolean
   onToggleBookmark?: () => void
   searchQuery?: string
+  /** Frågan är gjord (svaret visat eller rättat) – visas gråad */
+  isDone?: boolean
+  onDoneChange?: (done: boolean) => void
 }
 
 export function QuestionCard({
@@ -40,6 +43,8 @@ export function QuestionCard({
   isBookmarked,
   onToggleBookmark,
   searchQuery,
+  isDone,
+  onDoneChange,
 }: QuestionCardProps) {
   const [showAnswer, setShowAnswer] = useState(false)
   const [isExpanded, setIsExpanded] = useState(true)
@@ -161,9 +166,11 @@ export function QuestionCard({
       setIsChecked(true)
       persistState({ isCorrect: correct, isChecked: true })
     }
+    onDoneChange?.(true)
   }
 
   const handleReset = () => {
+    onDoneChange?.(false)
     setUserAnswer(null)
     setIsChecked(false)
     setIsCorrect(null)
@@ -183,6 +190,8 @@ export function QuestionCard({
   return (
     <Card className={cn(
       "overflow-hidden transition-all border-l-4",
+      // Gjorda frågor tonas ner men blir tydliga igen när man håller musen över eller arbetar i dem
+      isDone && "opacity-60 hover:opacity-100 focus-within:opacity-100",
       isChecked
         ? isCorrect
           ? "border-l-green-500 shadow-green-50/50"
@@ -216,6 +225,11 @@ export function QuestionCard({
                   </Badge>
                 )}
                 <span className="text-xs text-muted-foreground">{question.examPeriod}</span>
+                {isDone && (
+                  <Badge variant="outline" className="gap-1 border-green-300 bg-green-50 text-green-700 dark:bg-green-950/40 dark:text-green-300">
+                    <CheckCircle2 className="h-3 w-3" /> Gjord
+                  </Badge>
+                )}
               </div>
               <p className="text-sm text-muted-foreground">
                 {question.caseName ? (
@@ -374,6 +388,7 @@ export function QuestionCard({
                       const next = !showAnswer
                       setShowAnswer(next)
                       persistState({ showAnswer: next })
+                      if (next) onDoneChange?.(true)
                     }}
                     className="gap-2"
                   >

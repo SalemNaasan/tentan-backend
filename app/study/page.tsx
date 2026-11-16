@@ -24,10 +24,12 @@ import type { Semester, ExamType, ExamPeriod, SubjectArea, Question, Interaction
 
 // import { addFeedback } from "@/lib/feedback-store"
 
-import { Download, X, Filter, ChevronLeft, ChevronRight, CheckSquare, Square, Star, ArrowUpDown, ArrowUp, ArrowDown, Search } from "lucide-react"
+import { Download, X, Filter, ChevronLeft, ChevronRight, CheckSquare, Square, Star, ArrowUpDown, ArrowUp, ArrowDown, Search, RotateCcw } from "lucide-react"
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet"
 import { getBookmarkedIds, toggleBookmark as toggleBookmarkInStore, addBookmarks, removeBookmarks } from "@/lib/bookmarks-store"
 import { parseMatchingPairs } from "@/lib/matching"
+import { clearDone, getDoneIds, setDone } from "@/lib/done-store"
+import { clearAnswer } from "@/lib/answers-store"
 
 const PAGE_SIZE = 10
 
@@ -46,6 +48,9 @@ export default function StudyPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [bookmarkedIds, setBookmarkedIds] = useState<string[]>([])
   const [isOnlyBookmarked, setIsOnlyBookmarked] = useState(false)
+  const [doneIds, setDoneIds] = useState<string[]>([])
+  // Ökas vid "Börja om" så att frågekorten laddas om utan sparade svar
+  const [resetKey, setResetKey] = useState(0)
   const [selectedInteractions, setSelectedInteractions] = useState<InteractionType[]>([])
   const [selectedCases, setSelectedCases] = useState<string[]>([])
   const [sortBy, setSortBy] = useState<"number-asc" | "number-desc" | "points-asc" | "points-desc">("number-asc")
@@ -65,6 +70,7 @@ export default function StudyPage() {
         const allQuestions = await res.json()
         setQuestions(allQuestions)
         setBookmarkedIds(getBookmarkedIds())
+        setDoneIds(getDoneIds())
       } catch (error) {
         console.error("Failed to load questions", error)
       } finally {
@@ -231,6 +237,18 @@ export default function StudyPage() {
     const start = (currentPage - 1) * PAGE_SIZE
     return filteredQuestions.slice(start, start + PAGE_SIZE)
   }, [filteredQuestions, currentPage])
+
+  // Gjorda frågor räknas inom det aktuella urvalet, t.ex. 39/210 för T1 HT25
+  const doneSet = useMemo(() => new Set(doneIds), [doneIds])
+  const doneCount = useMemo(() => filteredQuestions.filter(q => doneSet.has(q.id)).length, [filteredQuestions, doneSet])
+
+  const handleRestart = () => {
+    const ids = filteredQuestions.map(q => q.id)
+    if (!confirm(`Börja om? De ${doneCount} gjorda frågorna i urvalet blir ogjorda igen och dina svar på dem rensas.`)) return
+    ids.forEach(id => clearAnswer(id))
+    setDoneIds(clearDone(ids))
+    setResetKey(k => k + 1)
+  }
 
   const handleToggleBookmark = (id: string) => {
     const next = toggleBookmarkInStore(id)
@@ -530,6 +548,31 @@ export default function StudyPage() {
                     </div>
                     <div className="h-10 w-px bg-border hidden sm:block" />
                     <div>
+                      <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Gjorda</h2>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xl font-bold text-foreground tabular-nums">
+                          {doneCount}/{filteredQuestions.length}
+                        </span>
+                        {doneCount > 0 && (
+                          <button
+                            type="button"
+                            onClick={handleRestart}
+                            className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                            title="Gör alla frågor i urvalet ogjorda igen"
+                          >
+                            <RotateCcw className="h-3 w-3" /> Börja om
+                          </button>
+                        )}
+                      </div>
+                      <div className="mt-1 h-1 w-28 overflow-hidden rounded-full bg-secondary">
+                        <div
+                          className="h-full rounded-full bg-green-500 transition-all"
+                          style={{ width: `${filteredQuestions.length ? (doneCount / filteredQuestions.length) * 100 : 0}%` }}
+                        />
+                      </div>
+                    </div>
+                    <div className="h-10 w-px bg-border hidden sm:block" />
+                    <div>
                       <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Bokmärkta</h2>
                       <div className="flex items-center gap-1.5">
                         <span className="text-xl font-bold text-foreground">{bookmarkedIds.length}</span>
@@ -769,7 +812,7 @@ export default function StudyPage() {
                 ) : filteredQuestions.length > 0 ? (
                   paginatedQuestions.map((question) => (
                     <QuestionCard
-                      key={question.id}
+                      key={`${question.id}-${resetKey}`}
                       question={question}
                       isSelected={selectedQuestions.includes(question.id)}
                       onSelectChange={(selected) =>
@@ -779,6 +822,8 @@ export default function StudyPage() {
                       isBookmarked={bookmarkedIds.includes(question.id)}
                       onToggleBookmark={() => handleToggleBookmark(question.id)}
                       searchQuery={searchQuery}
+                      isDone={doneSet.has(question.id)}
+                      onDoneChange={done => setDoneIds(setDone(question.id, done))}
                     />
                   ))
                 ) : (

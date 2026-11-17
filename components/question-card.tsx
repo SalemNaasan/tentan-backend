@@ -17,7 +17,8 @@ import {
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import type { Question } from "@/lib/types"
-import { ChevronDown, ChevronUp, Eye, EyeOff, MessageSquare, CheckCircle2, XCircle, RotateCcw, Star } from "lucide-react"
+import { ChevronDown, ChevronUp, Eye, EyeOff, MessageSquare, MessageCircle, CheckCircle2, XCircle, RotateCcw, Star } from "lucide-react"
+import { QuestionComments } from "./question-comments"
 import { QuestionRenderer } from "./question-renderers/question-renderer"
 import { cn } from "@/lib/utils"
 import { getUserAnswer, saveUserAnswer } from "@/lib/answers-store"
@@ -33,6 +34,9 @@ interface QuestionCardProps {
   /** Frågan är gjord (svaret visat eller rättat) – visas gråad */
   isDone?: boolean
   onDoneChange?: (done: boolean) => void
+  /** Antal kommentarer på frågan (visas på knappen) */
+  commentCount?: number
+  onCommentCountChange?: (count: number) => void
 }
 
 export function QuestionCard({
@@ -45,7 +49,10 @@ export function QuestionCard({
   searchQuery,
   isDone,
   onDoneChange,
+  commentCount = 0,
+  onCommentCountChange,
 }: QuestionCardProps) {
+  const [commentsOpen, setCommentsOpen] = useState(false)
   const [showAnswer, setShowAnswer] = useState(false)
   const [isExpanded, setIsExpanded] = useState(true)
   const [feedbackOpen, setFeedbackOpen] = useState(false)
@@ -401,6 +408,16 @@ export function QuestionCard({
                 )}
               </div>
 
+              <div className="flex items-center gap-1">
+              <Button
+                variant={commentsOpen ? "secondary" : "ghost"}
+                size="sm"
+                onClick={() => setCommentsOpen(o => !o)}
+                className="gap-2 text-muted-foreground hover:text-foreground"
+              >
+                <MessageCircle className="h-4 w-4" />
+                Kommentarer{commentCount > 0 ? ` (${commentCount})` : ""}
+              </Button>
               <Dialog open={feedbackOpen} onOpenChange={setFeedbackOpen}>
                 <DialogTrigger asChild>
                   <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:text-foreground">
@@ -439,7 +456,10 @@ export function QuestionCard({
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
+              </div>
             </div>
+
+            {commentsOpen && <QuestionComments questionId={question.id} onCountChange={onCommentCountChange} />}
 
             {/* Answer Section (only for show_answer mode or when revealed explicitly somehow) */}
             {showAnswer && (

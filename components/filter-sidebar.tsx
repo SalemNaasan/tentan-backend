@@ -71,6 +71,8 @@ interface FilterSidebarProps {
   selectedCases?: string[]
   setSelectedCases?: (cases: string[]) => void
   availableOptions?: AvailableOptions
+  doneFilter?: "all" | "done" | "todo"
+  setDoneFilter?: (value: "all" | "done" | "todo") => void
 }
 
 export function FilterSidebar({
@@ -89,6 +91,8 @@ export function FilterSidebar({
   selectedCases = [],
   setSelectedCases,
   availableOptions,
+  doneFilter = "all",
+  setDoneFilter,
 }: FilterSidebarProps) {
   // Val utan frågor givet de andra filtren gråas ut. Ett val som redan är ikryssat går alltid att kryssa ur.
   const hasOptions = !!availableOptions
@@ -161,6 +165,32 @@ export function FilterSidebar({
             Visa endast bokmärkta
           </div>
         </label>
+        {setDoneFilter && (
+          <div className="mt-4">
+            <h3 className="mb-2 text-sm font-semibold text-foreground uppercase tracking-wide">Status</h3>
+            <div className="grid grid-cols-3 gap-1 rounded-lg bg-secondary/60 p-1">
+              {(
+                [
+                  ["all", "Alla"],
+                  ["todo", "Ogjorda"],
+                  ["done", "Gjorda"],
+                ] as const
+              ).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setDoneFilter(value)}
+                  className={cn(
+                    "rounded-md px-2 py-1 text-xs font-medium transition-colors",
+                    doneFilter === value ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Termin – always fully active (it's the "controller") */}

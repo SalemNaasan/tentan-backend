@@ -16,11 +16,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
-import { Upload, FileText, Check, X, Edit2, Loader2, AlertCircle, Lock, Trash2, List, MessageSquare, Eye, EyeOff, Search, ArrowUpDown, Plus, PlusCircle, Image as ImageIcon, BookOpen, Bell, Briefcase, Copy, AlertTriangle, Stethoscope } from "lucide-react"
+import { Upload, FileText, Check, X, Edit2, Loader2, AlertCircle, Lock, Trash2, List, MessageSquare, Eye, EyeOff, Search, ArrowUpDown, Plus, PlusCircle, Image as ImageIcon, BookOpen, Bell, Briefcase, Copy, AlertTriangle, Stethoscope, MessageCircle } from "lucide-react"
 import type { Semester, ExamType, SubjectArea, ExamPeriod, InteractionType, Question, QuestionFeedback, FeedbackStatus, PPLCase } from "@/lib/types"
 import { EXAM_PERIODS } from "@/lib/types"
 import { ImageUpload } from "@/components/admin/image-upload"
 import { OsceEditor } from "@/components/admin/osce-editor"
+import { CommentsAdmin } from "@/components/admin/comments-admin"
 // import { mockQuestions } from "@/lib/mock-data"
 // import {
 //   getCustomQuestions,
@@ -1068,6 +1069,12 @@ export default function AdminPage() {
                 </TabsTrigger>
               )}
               {adminRole === "super" && (
+                <TabsTrigger value="comments" className="gap-2">
+                  <MessageCircle className="h-4 w-4" />
+                  Kommentarer
+                </TabsTrigger>
+              )}
+              {adminRole === "super" && (
                 <TabsTrigger value="osce" className="gap-2">
                   <Stethoscope className="h-4 w-4" />
                   OSCE
@@ -1864,6 +1871,12 @@ export default function AdminPage() {
             </TabsContent>
 
             {/* PPL Cases Tab */}
+            {adminRole === "super" && (
+              <TabsContent value="comments" className="space-y-6">
+                <CommentsAdmin />
+              </TabsContent>
+            )}
+
             {adminRole === "super" && (
               <TabsContent value="osce" className="space-y-6">
                 <OsceEditor />

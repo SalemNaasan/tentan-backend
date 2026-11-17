@@ -4,6 +4,7 @@ export const dynamic = "force-dynamic"
 
 
 import { useState, useMemo, useEffect, useRef } from "react"
+import Link from "next/link"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { QuestionCard } from "@/components/question-card"
@@ -24,7 +25,7 @@ import type { Semester, ExamType, ExamPeriod, SubjectArea, Question, Interaction
 
 // import { addFeedback } from "@/lib/feedback-store"
 
-import { Download, X, Filter, ChevronLeft, ChevronRight, CheckSquare, Square, Star, ArrowUpDown, ArrowUp, ArrowDown, Search, RotateCcw } from "lucide-react"
+import { Download, X, Filter, ChevronLeft, ChevronRight, CheckSquare, Square, Star, ArrowUpDown, ArrowUp, ArrowDown, Search, RotateCcw, Timer } from "lucide-react"
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet"
 import { getBookmarkedIds, toggleBookmark as toggleBookmarkInStore, addBookmarks, removeBookmarks } from "@/lib/bookmarks-store"
 import { parseMatchingPairs } from "@/lib/matching"
@@ -49,6 +50,10 @@ export default function StudyPage() {
   const [bookmarkedIds, setBookmarkedIds] = useState<string[]>([])
   const [isOnlyBookmarked, setIsOnlyBookmarked] = useState(false)
   const [doneIds, setDoneIds] = useState<string[]>([])
+  const [commentCounts, setCommentCounts] = useState<Record<string, number>>({})
+  const [doneFilter, setDoneFilter] = useState<"all" | "done" | "todo">("all")
+  // Frågor som just gjorts/gjorts om ligger kvar i listan tills filtren ändras, så att de inte försvinner mitt i
+  const [stickyIds, setStickyIds] = useState<string[]>([])
   // Ökas vid "Börja om" så att frågekorten laddas om utan sparade svar
   const [resetKey, setResetKey] = useState(0)
   const [selectedInteractions, setSelectedInteractions] = useState<InteractionType[]>([])
@@ -71,6 +76,10 @@ export default function StudyPage() {
         setQuestions(allQuestions)
         setBookmarkedIds(getBookmarkedIds())
         setDoneIds(getDoneIds())
+        fetch("/api/comments?counts=1", { cache: "no-store" })
+          .then(r => (r.ok ? r.json() : {}))
+          .then(setCommentCounts)
+          .catch(() => {})
       } catch (error) {
         console.error("Failed to load questions", error)
       } finally {
@@ -95,6 +104,7 @@ export default function StudyPage() {
         if (Array.isArray(saved.interactions)) setSelectedInteractions(saved.interactions)
         if (Array.isArray(saved.cases)) setSelectedCases(saved.cases)
         if (typeof saved.onlyBookmarked === "boolean") setIsOnlyBookmarked(saved.onlyBookmarked)
+        if (saved.done === "done" || saved.done === "todo") setDoneFilter(saved.done)
         if (typeof saved.sortBy === "string") setSortBy(saved.sortBy)
         if (typeof saved.search === "string") setSearchQuery(saved.search)
         if (typeof saved.page === "number" && saved.page > 1) {
@@ -121,6 +131,7 @@ export default function StudyPage() {
           interactions: selectedInteractions,
           cases: selectedCases,
           onlyBookmarked: isOnlyBookmarked,
+          done: doneFilter,
           sortBy,
           search: searchQuery,
           page: currentPage,
@@ -129,7 +140,7 @@ export default function StudyPage() {
     } catch {
       // går inte att spara – filtren gäller då bara tills sidan laddas om
     }
-  }, [filtersRestored, selectedSemesters, selectedExamTypes, selectedSubjects, selectedPeriods, selectedInteractions, selectedCases, isOnlyBookmarked, sortBy, searchQuery, currentPage])
+  }, [filtersRestored, selectedSemesters, selectedExamTypes, selectedSubjects, selectedPeriods, selectedInteractions, selectedCases, isOnlyBookmarked, sortBy, searchQuery, currentPage, doneFilter])
 
   // Reset page when filters change
   useEffect(() => {
@@ -140,9 +151,14 @@ export default function StudyPage() {
       return
     }
     setCurrentPage(1)
-  }, [selectedSemesters, selectedExamTypes, selectedSubjects, selectedPeriods, isOnlyBookmarked, selectedInteractions, selectedCases, searchQuery])
+  }, [selectedSemesters, selectedExamTypes, selectedSubjects, selectedPeriods, isOnlyBookmarked, selectedInteractions, selectedCases, searchQuery, doneFilter])
 
-  const filteredQuestions = useMemo(() => {
+  useEffect(() => {
+    setStickyIds([])
+  }, [selectedSemesters, selectedExamTypes, selectedSubjects, selectedPeriods, isOnlyBookmarked, selectedInteractions, selectedCases, searchQuery, doneFilter])
+
+  // Alla frågor som matchar filtren, oavsett om de är gjorda (räknaren "39/210" utgår från dessa)
+  const matchingQuestions = useMemo(() => {
 
     return questions.filter((q) => {
       if (q.isHidden) {
@@ -231,6 +247,15 @@ export default function StudyPage() {
     }
   }, [questions, selectedSemesters, selectedExamTypes, selectedPeriods, selectedSubjects, selectedInteractions, selectedCases])
 
+  // Gjorda frågor räknas inom det aktuella urvalet, t.ex. 39/210 för T1 HT25
+  const doneSet = useMemo(() => new Set(doneIds), [doneIds])
+
+  const filteredQuestions = useMemo(() => {
+    if (doneFilter === "all") return matchingQuestions
+    const sticky = new Set(stickyIds)
+    return matchingQuestions.filter(q => sticky.has(q.id) || doneSet.has(q.id) === (doneFilter === "done"))
+  }, [matchingQuestions, doneFilter, doneSet, stickyIds])
+
   const totalPages = Math.ceil(filteredQuestions.length / PAGE_SIZE)
 
   const paginatedQuestions = useMemo(() => {
@@ -238,12 +263,10 @@ export default function StudyPage() {
     return filteredQuestions.slice(start, start + PAGE_SIZE)
   }, [filteredQuestions, currentPage])
 
-  // Gjorda frågor räknas inom det aktuella urvalet, t.ex. 39/210 för T1 HT25
-  const doneSet = useMemo(() => new Set(doneIds), [doneIds])
-  const doneCount = useMemo(() => filteredQuestions.filter(q => doneSet.has(q.id)).length, [filteredQuestions, doneSet])
+  const doneCount = useMemo(() => matchingQuestions.filter(q => doneSet.has(q.id)).length, [matchingQuestions, doneSet])
 
   const handleRestart = () => {
-    const ids = filteredQuestions.map(q => q.id)
+    const ids = matchingQuestions.map(q => q.id)
     if (!confirm(`Börja om? De ${doneCount} gjorda frågorna i urvalet blir ogjorda igen och dina svar på dem rensas.`)) return
     ids.forEach(id => clearAnswer(id))
     setDoneIds(clearDone(ids))
@@ -480,6 +503,7 @@ export default function StudyPage() {
     setSelectedPeriods([])
     setSelectedInteractions([])
     setIsOnlyBookmarked(false)
+    setDoneFilter("all")
   }
 
   const hasActiveFilters =
@@ -488,7 +512,8 @@ export default function StudyPage() {
     selectedSubjects.length > 0 ||
     selectedPeriods.length > 0 ||
     selectedInteractions.length > 0 ||
-    isOnlyBookmarked
+    isOnlyBookmarked ||
+    doneFilter !== "all"
 
   const filterSidebarContent = (
     <FilterSidebar
@@ -507,6 +532,8 @@ export default function StudyPage() {
       selectedCases={selectedCases}
       setSelectedCases={setSelectedCases}
       availableOptions={availableOptions}
+      doneFilter={doneFilter}
+      setDoneFilter={setDoneFilter}
     />
   )
 
@@ -517,13 +544,20 @@ export default function StudyPage() {
       <main className="flex-1">
         <div className="mx-auto max-w-6xl px-4 py-8">
           {/* Page Header */}
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold tracking-tight text-foreground">
-              Övningsfrågor
-            </h1>
-            <p className="mt-2 text-muted-foreground">
-              Bläddra och öva på gamla tentafrågor. Välj frågor för att exportera till Anki.
-            </p>
+          <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight text-foreground">
+                Övningsfrågor
+              </h1>
+              <p className="mt-2 text-muted-foreground">
+                Bläddra och öva på gamla tentafrågor. Välj frågor för att exportera till Anki.
+              </p>
+            </div>
+            <Button asChild className="gap-2">
+              <Link href="/study/tenta">
+                <Timer className="h-4 w-4" /> Gör en tenta på tid
+              </Link>
+            </Button>
           </div>
 
           <div className="flex gap-8">
@@ -551,7 +585,7 @@ export default function StudyPage() {
                       <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Gjorda</h2>
                       <div className="flex items-center gap-2">
                         <span className="text-xl font-bold text-foreground tabular-nums">
-                          {doneCount}/{filteredQuestions.length}
+                          {doneCount}/{matchingQuestions.length}
                         </span>
                         {doneCount > 0 && (
                           <button
@@ -567,7 +601,7 @@ export default function StudyPage() {
                       <div className="mt-1 h-1 w-28 overflow-hidden rounded-full bg-secondary">
                         <div
                           className="h-full rounded-full bg-green-500 transition-all"
-                          style={{ width: `${filteredQuestions.length ? (doneCount / filteredQuestions.length) * 100 : 0}%` }}
+                          style={{ width: `${matchingQuestions.length ? (doneCount / matchingQuestions.length) * 100 : 0}%` }}
                         />
                       </div>
                     </div>
@@ -737,6 +771,15 @@ export default function StudyPage() {
                           </button>
                         </Badge>
                       ))}
+                      {doneFilter !== "all" && (
+                        <Badge variant="secondary" className="gap-1">
+                          {doneFilter === "done" ? "Gjorda" : "Ogjorda"}
+                          <button type="button" onClick={() => setDoneFilter("all")} className="ml-1 hover:text-foreground">
+                            <X className="h-3 w-3" />
+                            <span className="sr-only">Ta bort statusfiltret</span>
+                          </button>
+                        </Badge>
+                      )}
                       {isOnlyBookmarked && (
                         <Badge variant="secondary" className="gap-1">
                           Bokmärkta
@@ -823,7 +866,12 @@ export default function StudyPage() {
                       onToggleBookmark={() => handleToggleBookmark(question.id)}
                       searchQuery={searchQuery}
                       isDone={doneSet.has(question.id)}
-                      onDoneChange={done => setDoneIds(setDone(question.id, done))}
+                      commentCount={commentCounts[question.id] ?? 0}
+                      onCommentCountChange={n => setCommentCounts(c => ({ ...c, [question.id]: n }))}
+                      onDoneChange={done => {
+                        setDoneIds(setDone(question.id, done))
+                        setStickyIds(ids => (ids.includes(question.id) ? ids : [...ids, question.id]))
+                      }}
                     />
                   ))
                 ) : (

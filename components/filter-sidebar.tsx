@@ -278,7 +278,7 @@ export function FilterSidebar({
           )}
         </div>
         <div className="space-y-2">
-          {["18","19","20","21","22","23","24","25","26","27","28","29"].map((year) => (
+          {["17","18","19","20","21","22","23","24","25","26","27","28","29"].map((year) => (
             <div key={year} className="flex items-center gap-1.5">
               <span className="text-xs text-muted-foreground w-6 shrink-0">{year}</span>
               {(["VT","HT"] as const).map((half) => {

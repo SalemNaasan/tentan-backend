@@ -30,7 +30,7 @@ import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/s
 import { getBookmarkedIds, toggleBookmark as toggleBookmarkInStore, addBookmarks, removeBookmarks } from "@/lib/bookmarks-store"
 import { parseMatchingPairs } from "@/lib/matching"
 import { clearDone, getDoneIds, setDone } from "@/lib/done-store"
-import { lectureGroupsFor, lectureRank } from "@/lib/lectures"
+import { LECTURES_ENABLED, lectureGroupsFor, lectureRank } from "@/lib/lectures"
 import { clearAnswer } from "@/lib/answers-store"
 
 const PAGE_SIZE = 10
@@ -107,8 +107,8 @@ export default function StudyPage() {
         if (Array.isArray(saved.cases)) setSelectedCases(saved.cases)
         if (typeof saved.onlyBookmarked === "boolean") setIsOnlyBookmarked(saved.onlyBookmarked)
         if (saved.done === "done" || saved.done === "todo") setDoneFilter(saved.done)
-        if (typeof saved.sortBy === "string") setSortBy(saved.sortBy)
-        if (Array.isArray(saved.lectures)) setSelectedLectures(saved.lectures)
+        if (typeof saved.sortBy === "string" && (LECTURES_ENABLED || saved.sortBy !== "lecture")) setSortBy(saved.sortBy)
+        if (LECTURES_ENABLED && Array.isArray(saved.lectures)) setSelectedLectures(saved.lectures)
         if (typeof saved.search === "string") setSearchQuery(saved.search)
         if (typeof saved.page === "number" && saved.page > 1) {
           skipPageReset.current = true
@@ -201,7 +201,7 @@ export default function StudyPage() {
         const matchesNumber = q.questionNumber.toString().includes(query)
         const matchesSubject = q.subjectArea.toLowerCase().includes(query)
         const matchesAnswer = q.answer?.toLowerCase().includes(query) || false
-        const matchesCase = q.caseName?.toLowerCase().includes(query) || q.lecture?.toLowerCase().includes(query) || false
+        const matchesCase = q.caseName?.toLowerCase().includes(query) || (LECTURES_ENABLED && q.lecture?.toLowerCase().includes(query)) || false
         const matchesOptions = q.options?.some(opt => opt.toLowerCase().includes(query)) || false
         const matchesCorrectAnswer = typeof q.correctAnswer === "string"
           ? q.correctAnswer.toLowerCase().includes(query)
@@ -548,7 +548,7 @@ export default function StudyPage() {
       selectedInteractions={selectedInteractions}
       setSelectedInteractions={setSelectedInteractions}
       selectedCases={selectedCases}
-      lectureGroups={lectureGroupsFor(selectedSemesters)}
+      lectureGroups={LECTURES_ENABLED ? lectureGroupsFor(selectedSemesters) : []}
       selectedLectures={selectedLectures}
       setSelectedLectures={setSelectedLectures}
       setSelectedCases={setSelectedCases}
@@ -850,7 +850,7 @@ export default function StudyPage() {
                     <SelectItem value="number-desc">Nummer (Fallande)</SelectItem>
                     <SelectItem value="points-asc">Poäng (Stigande)</SelectItem>
                     <SelectItem value="points-desc">Poäng (Fallande)</SelectItem>
-                    <SelectItem value="lecture">Föreläsning</SelectItem>
+                    {LECTURES_ENABLED && <SelectItem value="lecture">Föreläsning</SelectItem>}
                   </SelectContent>
                 </Select>
                 <Button

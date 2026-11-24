@@ -21,6 +21,7 @@ import { ChevronDown, ChevronUp, Eye, EyeOff, MessageSquare, MessageCircle, Chec
 import { QuestionComments } from "./question-comments"
 import { QuestionRenderer } from "./question-renderers/question-renderer"
 import { cn } from "@/lib/utils"
+import { LECTURES_ENABLED } from "@/lib/lectures"
 import { getUserAnswer, saveUserAnswer } from "@/lib/answers-store"
 
 interface QuestionCardProps {
@@ -232,7 +233,7 @@ export function QuestionCard({
                   </Badge>
                 )}
                 <span className="text-xs text-muted-foreground">{question.examPeriod === "Okänd" ? "Okänd tenta" : question.examPeriod}</span>
-                {question.lecture && (
+                {LECTURES_ENABLED && question.lecture && (
                   <Badge variant="outline" className="gap-1 font-normal text-muted-foreground">
                     <BookOpen className="h-3 w-3" /> {question.lecture}
                   </Badge>

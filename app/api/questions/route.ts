@@ -93,7 +93,8 @@ export async function GET() {
       isHidden: q.is_hidden,
       points: q.points,
       imageUrl: q.image_url,
-      caseName: q.case_name || q.caseName
+      caseName: q.case_name || q.caseName,
+      lecture: q.lecture || undefined
     }))
 
     // 4. Combine and filter
@@ -152,17 +153,28 @@ export async function POST(req: NextRequest) {
       is_hidden: q.isHidden,
       points: q.points,
       image_url: q.imageUrl,
-      case_name: q.caseName
+      case_name: q.caseName,
+      // Skriv bara föreläsning om den skickas med (null = ta bort), så att en sparning utan fältet inte nollställer den
+      ...("lecture" in q ? { lecture: q.lecture?.trim() || null } : {})
     }))
 
     let { error } = await supabase
       .from('custom_questions')
       .upsert(toUpsert)
 
+    // Kolumnen lecture finns först efter supabase/lectures.sql – spara utan den så länge
+    if (error && error.message?.includes('lecture')) {
+      console.warn("Supabase custom_questions table missing 'lecture' column. Retrying without lecture...")
+      const fallbackResult = await supabase
+        .from('custom_questions')
+        .upsert(toUpsert.map(({ lecture, ...rest }: any) => rest))
+      error = fallbackResult.error
+    }
+
     // Fallback if case_name column does not exist in Supabase custom_questions table schema yet
     if (error && (error.message?.includes('case_name') || error.message?.includes("'case_name'"))) {
       console.warn("Supabase custom_questions table missing 'case_name' column. Retrying without case_name...")
-      const fallbackUpsert = toUpsert.map(({ case_name, ...rest }) => rest)
+      const fallbackUpsert = toUpsert.map(({ case_name, lecture, ...rest }: any) => rest)
       const fallbackResult = await supabase
         .from('custom_questions')
         .upsert(fallbackUpsert)

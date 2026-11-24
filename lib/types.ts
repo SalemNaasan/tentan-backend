@@ -1,6 +1,8 @@
 export type Semester = "T1" | "T2" | "T3" | "T4" | "T5" | "T6" | "T7" | "T8" | "T9" | "T10"
 
 export type ExamPeriod =
+  | "HT18"
+  | "VT19" | "HT19"
   | "VT20" | "HT20"
   | "VT21" | "HT21"
   | "VT22" | "HT22"
@@ -11,8 +13,12 @@ export type ExamPeriod =
   | "VT27" | "HT27"
   | "VT28" | "HT28"
   | "VT29" | "HT29"
+  /** Frågor där det inte framgår vilken tenta de kommer från */
+  | "Okänd"
 
 export const EXAM_PERIODS: ExamPeriod[] = [
+  "HT18",
+  "VT19", "HT19",
   "VT20", "HT20",
   "VT21", "HT21",
   "VT22", "HT22",
@@ -23,6 +29,7 @@ export const EXAM_PERIODS: ExamPeriod[] = [
   "VT27", "HT27",
   "VT28", "HT28",
   "VT29", "HT29",
+  "Okänd",
 ]
 
 export type ExamType = "regular" | "re-exam"
@@ -64,6 +71,8 @@ export interface Question {
   points?: number
   imageUrl?: string
   caseName?: string
+  /** Föreläsningen frågan hör till, t.ex. "Erytropoes" (se lib/lectures.ts) */
+  lecture?: string | null
 }
 
 export interface Exam {

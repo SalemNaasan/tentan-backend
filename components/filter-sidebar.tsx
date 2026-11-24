@@ -48,6 +48,7 @@ const interactionTypes: { value: InteractionType; label: string }[] = [
 const defaultCases = ["Fall A", "Fall B", "Fall C", "Fall D", "Fall E", "Fall F"]
 
 interface AvailableOptions {
+  lectures?: Set<string>
   examTypes: Set<string>
   periods: Set<string>
   subjects: Set<string>
@@ -71,6 +72,9 @@ interface FilterSidebarProps {
   selectedCases?: string[]
   setSelectedCases?: (cases: string[]) => void
   availableOptions?: AvailableOptions
+  lectureGroups?: { theme: string; semester: string; lectures: string[] }[]
+  selectedLectures?: string[]
+  setSelectedLectures?: (lectures: string[]) => void
   doneFilter?: "all" | "done" | "todo"
   setDoneFilter?: (value: "all" | "done" | "todo") => void
 }
@@ -93,6 +97,9 @@ export function FilterSidebar({
   availableOptions,
   doneFilter = "all",
   setDoneFilter,
+  lectureGroups = [],
+  selectedLectures = [],
+  setSelectedLectures,
 }: FilterSidebarProps) {
   // Val utan frågor givet de andra filtren gråas ut. Ett val som redan är ikryssat går alltid att kryssa ur.
   const hasOptions = !!availableOptions
@@ -271,7 +278,7 @@ export function FilterSidebar({
           )}
         </div>
         <div className="space-y-2">
-          {["20","21","22","23","24","25","26","27","28","29"].map((year) => (
+          {["18","19","20","21","22","23","24","25","26","27","28","29"].map((year) => (
             <div key={year} className="flex items-center gap-1.5">
               <span className="text-xs text-muted-foreground w-6 shrink-0">{year}</span>
               {(["VT","HT"] as const).map((half) => {
@@ -297,8 +304,73 @@ export function FilterSidebar({
               })}
             </div>
           ))}
+          {/* Frågor där det inte framgår vilken tenta de kommer från */}
+          {(isPeriodAvailable("Okänd") || selectedPeriods.includes("Okänd")) && (
+            <button
+              onClick={() => handlePeriodChange("Okänd", !selectedPeriods.includes("Okänd"))}
+              className={cn(
+                "mt-1 rounded-full border px-2.5 py-0.5 text-xs font-medium transition-all",
+                selectedPeriods.includes("Okänd")
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border bg-transparent text-muted-foreground hover:border-foreground hover:text-foreground"
+              )}
+            >
+              Okänd tenta
+            </button>
+          )}
         </div>
       </div>
+
+      {/* Föreläsning – finns för terminer där frågorna sorterats per föreläsning */}
+      {setSelectedLectures && lectureGroups.length > 0 && (
+        <div className="border-t border-border pt-6">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-foreground uppercase tracking-wide">Föreläsning</h3>
+            {selectedLectures.length > 0 && (
+              <button onClick={() => setSelectedLectures([])} className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+                Rensa
+              </button>
+            )}
+          </div>
+          <div className="space-y-1">
+            {lectureGroups.map((group) => {
+              const chosen = group.lectures.filter((l) => selectedLectures.includes(l)).length
+              return (
+                <details key={`${group.semester}-${group.theme}`} open={chosen > 0} className="group rounded-md">
+                  <summary className="flex cursor-pointer list-none items-center justify-between rounded-md px-1 py-1 text-sm font-medium hover:bg-secondary/60">
+                    <span>
+                      {lectureGroups.some((g) => g.semester !== group.semester) ? `${group.semester} · ` : ""}
+                      {group.theme}
+                    </span>
+                    <span className="text-xs text-muted-foreground">{chosen > 0 ? `${chosen} valda` : group.lectures.length}</span>
+                  </summary>
+                  <div className="mt-1 space-y-1.5 pb-2 pl-2">
+                    {group.lectures.map((lecture) => {
+                      const checked = selectedLectures.includes(lecture)
+                      const available = !availableOptions?.lectures || availableOptions.lectures.has(lecture) || checked
+                      return (
+                        <div key={lecture} className={cn("flex items-center space-x-2 transition-opacity", !available && "opacity-35 pointer-events-none")}>
+                          <Checkbox
+                            id={`lecture-${group.semester}-${lecture}`}
+                            checked={checked}
+                            disabled={!available}
+                            onCheckedChange={(v) =>
+                              setSelectedLectures(v ? [...selectedLectures, lecture] : selectedLectures.filter((l) => l !== lecture))
+                            }
+                          />
+                          <Label htmlFor={`lecture-${group.semester}-${lecture}`} className="cursor-pointer text-sm font-normal leading-snug">
+                            {lecture}
+                          </Label>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </details>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Ämnesområde */}
       <div className="border-t border-border pt-6">

@@ -17,7 +17,7 @@ import {
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import type { Question } from "@/lib/types"
-import { ChevronDown, ChevronUp, Eye, EyeOff, MessageSquare, MessageCircle, CheckCircle2, XCircle, RotateCcw, Star } from "lucide-react"
+import { ChevronDown, ChevronUp, Eye, EyeOff, MessageSquare, MessageCircle, CheckCircle2, XCircle, RotateCcw, Star, BookOpen } from "lucide-react"
 import { QuestionComments } from "./question-comments"
 import { QuestionRenderer } from "./question-renderers/question-renderer"
 import { cn } from "@/lib/utils"
@@ -231,7 +231,12 @@ export function QuestionCard({
                     {question.caseName.toLowerCase().startsWith('fall') ? question.caseName : `Fall ${question.caseName.toUpperCase()}`}
                   </Badge>
                 )}
-                <span className="text-xs text-muted-foreground">{question.examPeriod}</span>
+                <span className="text-xs text-muted-foreground">{question.examPeriod === "Okänd" ? "Okänd tenta" : question.examPeriod}</span>
+                {question.lecture && (
+                  <Badge variant="outline" className="gap-1 font-normal text-muted-foreground">
+                    <BookOpen className="h-3 w-3" /> {question.lecture}
+                  </Badge>
+                )}
                 {isDone && (
                   <Badge variant="outline" className="gap-1 border-green-300 bg-green-50 text-green-700 dark:bg-green-950/40 dark:text-green-300">
                     <CheckCircle2 className="h-3 w-3" /> Gjord
@@ -242,7 +247,7 @@ export function QuestionCard({
                 {question.caseName ? (
                   <>Fråga <span className="font-bold text-foreground">{question.caseName.replace(/^fall\s*/i, '').trim().toUpperCase()}:{question.questionNumber}</span></>
                 ) : (
-                  <>Fråga {question.questionNumber}</>
+                  <>Fråga{question.questionNumber ? ` ${question.questionNumber}` : ""}</>
                 )}
                 {question.points !== undefined && (
                   <span className="ml-2 px-1.5 py-0.5 rounded-md bg-accent/10 text-accent font-semibold text-[10px] uppercase tracking-wider border border-accent/20">

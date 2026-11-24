@@ -22,6 +22,7 @@ import { EXAM_PERIODS } from "@/lib/types"
 import { ImageUpload } from "@/components/admin/image-upload"
 import { OsceEditor } from "@/components/admin/osce-editor"
 import { CommentsAdmin } from "@/components/admin/comments-admin"
+import { LECTURES } from "@/lib/lectures"
 // import { mockQuestions } from "@/lib/mock-data"
 // import {
 //   getCustomQuestions,
@@ -48,6 +49,7 @@ interface ExtractedQuestion {
   status: "pending" | "approved" | "rejected" | "editing"
   imageUrl?: string
   caseName?: string
+  lecture?: string
 }
 
 interface UploadState {
@@ -411,6 +413,7 @@ export default function AdminPage() {
           correctAnswer,
           points: excelRow.points,
           imageUrl: excelRow.imageUrl,
+          lecture: row[9] != null && String(row[9]).trim() ? String(row[9]).trim() : undefined,
           status: "pending" as const,
         })
 
@@ -511,6 +514,7 @@ export default function AdminPage() {
       points: q.points,
       imageUrl: q.imageUrl,
       caseName: q.caseName,
+      lecture: q.lecture || null,
     }))
 
     try {
@@ -1160,7 +1164,7 @@ export default function AdminPage() {
                 <CardHeader>
                   <CardTitle>Ladda upp Excel-fil</CardTitle>
                   <CardDescription>
-                    Excel-filen ska ha 4 kolumner: frågnummer, tema, fråga, svarförslag
+                    Excel-filen ska ha 4 kolumner: frågnummer, tema, fråga, svarförslag. Valfritt: kolumn J = föreläsning (t.ex. Erytropoes).
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -1640,6 +1644,12 @@ export default function AdminPage() {
                                   <Badge variant="secondary" className="text-xs">
                                     {subjectLabels[question.subjectArea]}
                                   </Badge>
+                                  {question.lecture && (
+                                    <Badge variant="outline" className="text-xs flex items-center gap-1">
+                                      <BookOpen className="h-3 w-3" />
+                                      {question.lecture}
+                                    </Badge>
+                                  )}
                                   {duplicateQuestionIdSet.has(question.id) && (
                                     <Badge variant="destructive" className="text-xs flex items-center gap-1">
                                       <Copy className="h-3 w-3" />
@@ -2260,6 +2270,25 @@ export default function AdminPage() {
                   }
                 />
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="avail-edit-lecture">Föreläsning</Label>
+                <Input
+                  id="avail-edit-lecture"
+                  list="avail-edit-lecture-list"
+                  placeholder="t.ex. Erytropoes"
+                  value={editingAvailableQuestion.lecture || ""}
+                  onChange={(e) =>
+                    setEditingAvailableQuestion((prev) =>
+                      prev ? { ...prev, lecture: e.target.value || null } : null
+                    )
+                  }
+                />
+                <datalist id="avail-edit-lecture-list">
+                  {(LECTURES[editingAvailableQuestion.semester] ?? []).flatMap((g) => g.lectures).map((l) => (
+                    <option key={l} value={l} />
+                  ))}
+                </datalist>
+              </div>
               <div className="flex justify-end gap-2 pt-4">
                 <Button variant="outline" onClick={() => setEditingAvailableQuestion(null)}>
                   Avbryt
@@ -2403,6 +2432,21 @@ export default function AdminPage() {
                     )
                   }
                 />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-lecture">Föreläsning (valfritt)</Label>
+                <Input
+                  id="edit-lecture"
+                  list="edit-lecture-list"
+                  placeholder="t.ex. Erytropoes"
+                  value={editingQuestion.lecture || ""}
+                  onChange={(e) => setEditingQuestion((prev) => (prev ? { ...prev, lecture: e.target.value } : null))}
+                />
+                <datalist id="edit-lecture-list">
+                  {(LECTURES[selectedSemester] ?? []).flatMap((g) => g.lectures).map((l) => (
+                    <option key={l} value={l} />
+                  ))}
+                </datalist>
               </div>
               <ImageUpload
                 value={editingQuestion.imageUrl}
@@ -2616,6 +2660,21 @@ export default function AdminPage() {
                   value={newQuestion.caseName || ""}
                   onChange={(e) => setNewQuestion(prev => ({ ...prev, caseName: e.target.value }))}
                 />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="new-lecture">Föreläsning (valfritt)</Label>
+                <Input
+                  id="new-lecture"
+                  list="new-lecture-list"
+                  placeholder="t.ex. Erytropoes"
+                  value={newQuestion.lecture || ""}
+                  onChange={(e) => setNewQuestion((prev) => ({ ...prev, lecture: e.target.value || null }))}
+                />
+                <datalist id="new-lecture-list">
+                  {(LECTURES[(newQuestion.semester ?? "T1")] ?? []).flatMap((g) => g.lectures).map((l) => (
+                    <option key={l} value={l} />
+                  ))}
+                </datalist>
               </div>
 
               <ImageUpload

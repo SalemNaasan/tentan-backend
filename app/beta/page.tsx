@@ -68,7 +68,7 @@ export default function BetaPage() {
               <CardTitle>{beta ? "Beta är aktiverat" : "Betafunktioner"}</CardTitle>
               <CardDescription>
                 {beta
-                  ? "Du ser fler tentafrågor och kan filtrera och sortera frågor per föreläsning på övningssidan."
+                  ? "Du ser fler tentafrågor, kan filtrera och sortera per föreläsning och kan ställa frågor till AI-chatten för din termin."
                   : "Har du fått en betakod? Skriv in den här för att prova nya funktioner innan de släpps."}
               </CardDescription>
             </CardHeader>
@@ -77,6 +77,9 @@ export default function BetaPage() {
                 <div className="space-y-3">
                   <Button asChild className="w-full">
                     <Link href="/study">Till övningsfrågorna</Link>
+                  </Button>
+                  <Button asChild variant="outline" className="w-full">
+                    <Link href="/chat">Öppna AI-chatten</Link>
                   </Button>
                   <Button variant="ghost" className="w-full text-muted-foreground" onClick={deactivate} disabled={busy}>
                     Stäng av beta på den här enheten

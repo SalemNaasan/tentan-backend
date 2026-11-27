@@ -31,7 +31,12 @@ export function setBetaStatus(beta: boolean) {
 }
 
 export function useBeta(): boolean {
-  const [beta, setBeta] = useState<boolean>(cached ?? false)
+  return useBetaState() === true
+}
+
+/** Som useBeta, men null medan statusen hämtas (för sidor som inte ska blinka till) */
+export function useBetaState(): boolean | null {
+  const [beta, setBeta] = useState<boolean | null>(cached)
   useEffect(() => {
     listeners.add(setBeta)
     if (cached === null) fetchBeta()

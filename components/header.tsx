@@ -5,14 +5,18 @@ import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { BookOpen } from "lucide-react"
 import { FEATURES } from "@/lib/features"
+import { useBeta } from "@/lib/use-beta"
 
 export function Header() {
   const pathname = usePathname()
+  const beta = useBeta()
 
   const navLinks = [
     { href: "/study", label: "Plugga" },
     ...(FEATURES.cases ? [{ href: "/cases", label: "PPL/Fall" }] : []),
     { href: "/osce", label: "OSCE" },
+    // AI-chatten är en betafunktion och syns bara med betakod
+    ...(beta ? [{ href: "/chat", label: "AI-chatt" }] : []),
     { href: "/about", label: "Om oss" },
   ]
 

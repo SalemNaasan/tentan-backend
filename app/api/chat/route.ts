@@ -1,17 +1,16 @@
 import { createHash } from "crypto"
 import { NextRequest, NextResponse } from "next/server"
-import Anthropic from "@anthropic-ai/sdk"
 import { getAdminRole } from "@/lib/admin-auth"
 import { hasBetaAccess } from "@/lib/beta-auth"
 import { supabaseAdmin as supabase } from "@/lib/supabase-server"
 import { searchMaterial } from "@/lib/chat/material"
+import { ChatProviderError, activeProvider, providerKeyMissing, streamAnswer, type ChatTurn } from "@/lib/chat/providers"
 import { CHAT_DAILY_LIMIT_PER_USER, CHAT_DAILY_LIMIT_TOTAL, CHAT_MAX_QUESTION_CHARS, CHAT_SEMESTERS } from "@/lib/chat/config"
 import type { Semester } from "@/lib/types"
 
 export const dynamic = "force-dynamic"
 export const maxDuration = 60
 
-const MODEL = "claude-haiku-5-5"
 const HISTORY_MESSAGES = 8
 
 function systemPrompt(semester: Semester): string {
@@ -81,8 +80,9 @@ export async function POST(req: NextRequest) {
     const found = await searchMaterial(semester, last.content)
     return NextResponse.json({ docs: found.map(d => ({ label: d.label, chars: d.text.length })) })
   }
-  if (!process.env.ANTHROPIC_API_KEY) {
-    return NextResponse.json({ error: "Chatten är inte konfigurerad än (ANTHROPIC_API_KEY saknas)." }, { status: 503 })
+  const provider = activeProvider()
+  if (!provider || providerKeyMissing(provider)) {
+    return NextResponse.json({ error: "Chatten är inte konfigurerad än (API-nyckel saknas)." }, { status: 503 })
   }
 
   // Dagliga gränser (per besökare och för hela sajten)
@@ -111,38 +111,27 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Kunde inte hämta materialet just nu." }, { status: 500 })
   }
 
-  const apiMessages: Anthropic.MessageParam[] = messages.map((m, i) =>
+  const apiMessages: ChatTurn[] = messages.map((m, i) =>
     i === messages.length - 1
       ? { role: "user", content: `${materialBlock(semester, docs)}\n\nStudentens fråga: ${m.content}` }
       : { role: m.role, content: m.content }
   )
 
-  const client = new Anthropic()
   const encoder = new TextEncoder()
 
   const body = new ReadableStream<Uint8Array>({
     async start(controller) {
       const send = (text: string) => controller.enqueue(encoder.encode(text))
       try {
-        const stream = client.messages.stream({
-          model: MODEL,
-          max_tokens: 8000,
-          output_config: { effort: "low" },
-          system: systemPrompt(semester),
-          messages: apiMessages,
-        })
-        for await (const event of stream) {
-          if (event.type === "content_block_delta" && event.delta.type === "text_delta") send(event.delta.text)
+        for await (const text of streamAnswer(provider, { system: systemPrompt(semester), messages: apiMessages, maxTokens: 8000 })) {
+          send(text)
         }
-        const final = await stream.finalMessage()
-        if (final.stop_reason === "refusal") send("\n\n_Det här kan jag tyvärr inte svara på. Ställ gärna en annan fråga om terminens innehåll._")
-        else if (final.stop_reason === "max_tokens") send(" …")
       } catch (error) {
-        console.error("Chat API error:", error)
-        if (error instanceof Anthropic.RateLimitError) send("\n\n_AI:n är hårt belastad just nu. Försök igen om en stund._")
-        else if (error instanceof Anthropic.AuthenticationError) send("\n\n_Chatten är felkonfigurerad (API-nyckeln). Säg till den som driver sajten._")
-        else if (error instanceof Anthropic.APIError) send("\n\n_Något gick fel hos AI-tjänsten. Försök igen._")
-        else send("\n\n_Anslutningen bröts. Försök igen._")
+        console.error(`Chat API error (${provider}):`, error)
+        const kind = error instanceof ChatProviderError ? error.kind : "other"
+        if (kind === "rate_limit") send("\n\n_AI:n är hårt belastad just nu. Försök igen om en stund._")
+        else if (kind === "config") send("\n\n_Chatten är felkonfigurerad (API-nyckel eller modell). Säg till den som driver sajten._")
+        else send("\n\n_Något gick fel hos AI-tjänsten. Försök igen._")
       } finally {
         controller.close()
       }

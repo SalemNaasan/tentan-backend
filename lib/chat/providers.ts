@@ -60,32 +60,42 @@ async function* streamClaude(req: StreamRequest): AsyncGenerator<string> {
 
 // ---------- Gemini (Google) ----------
 
-// Modellen väljs med GEMINI_MODEL; standard är en snabb och billig Flash-modell med gratiskvot
-const GEMINI_DEFAULT_MODEL = "gemini-2.5-flash"
+// Modeller i turordning (GEMINI_MODEL, kommaseparerade). Är en modell överbelastad (429/503) provas nästa.
+// Båda standardmodellerna ingår i Googles gratiskvot.
+const GEMINI_DEFAULT_MODELS = "gemini-3.5-flash,gemini-3.5-flash-lite"
+
+async function openGemini(req: StreamRequest): Promise<Response> {
+  const models = (process.env.GEMINI_MODEL?.trim() || GEMINI_DEFAULT_MODELS).split(",").map(m => m.trim()).filter(Boolean)
+  let lastStatus = 0
+  for (const model of models) {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-goog-api-key": process.env.GEMINI_API_KEY! },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: req.system }] },
+          contents: req.messages.map(m => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] })),
+          // Lågt tänkande: svaren bygger på materialet, och det halverar svarstiden
+          generationConfig: { maxOutputTokens: req.maxTokens, thinkingConfig: { thinkingLevel: process.env.GEMINI_THINKING?.trim() || "low" } },
+        }),
+      }
+    )
+    if (res.ok && res.body) return res
+    lastStatus = res.status
+    console.error(`Gemini ${model} ${res.status}:`, (await res.text().catch(() => "")).slice(0, 300))
+    // Bara överbelastning eller tillfälliga fel går vidare till nästa modell
+    if (![429, 500, 503].includes(res.status)) break
+  }
+  if (lastStatus === 429 || lastStatus === 503) throw new ChatProviderError("rate limit", "rate_limit")
+  if ([400, 401, 403, 404].includes(lastStatus)) throw new ChatProviderError(`gemini ${lastStatus}`, "config")
+  throw new ChatProviderError(`gemini ${lastStatus}`, "other")
+}
 
 async function* streamGemini(req: StreamRequest): AsyncGenerator<string> {
-  const model = process.env.GEMINI_MODEL?.trim() || GEMINI_DEFAULT_MODEL
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-goog-api-key": process.env.GEMINI_API_KEY! },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: req.system }] },
-        contents: req.messages.map(m => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] })),
-        generationConfig: { maxOutputTokens: req.maxTokens },
-      }),
-    }
-  )
-  if (!res.ok || !res.body) {
-    const detail = await res.text().catch(() => "")
-    console.error(`Gemini ${res.status}:`, detail.slice(0, 500))
-    if (res.status === 429) throw new ChatProviderError("rate limit", "rate_limit")
-    if (res.status === 400 || res.status === 401 || res.status === 403 || res.status === 404) throw new ChatProviderError(`gemini ${res.status}`, "config")
-    throw new ChatProviderError(`gemini ${res.status}`, "other")
-  }
+  const res = await openGemini(req)
 
-  const reader = res.body.getReader()
+  const reader = res.body!.getReader()
   const decoder = new TextDecoder()
   let buffer = ""
   let finish: string | undefined

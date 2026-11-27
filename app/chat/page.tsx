@@ -26,7 +26,7 @@ function inline(text: string, key: string): ReactNode[] {
     if (part.startsWith("**") && part.endsWith("**")) return <strong key={`${key}-${i}`}>{part.slice(2, -2)}</strong>
     if (part.startsWith("[") && part.endsWith("]"))
       return (
-        <span key={`${key}-${i}`} className="mx-0.5 inline-block rounded bg-secondary px-1.5 py-0.5 align-baseline text-[11px] font-medium text-muted-foreground">
+        <span key={`${key}-${i}`} className="mx-0.5 rounded bg-secondary px-1.5 py-0.5 align-baseline text-[11px] font-medium text-muted-foreground [box-decoration-break:clone] [overflow-wrap:anywhere]">
           {part.slice(1, -1)}
         </span>
       )
@@ -34,29 +34,42 @@ function inline(text: string, key: string): ReactNode[] {
   })
 }
 
+// Radvis: rubriker (#), punkt- och nummerlistor med indrag, avdelare (---) och stycken
 function Formatted({ text }: { text: string }) {
-  const blocks = text.replace(/\r/g, "").split(/\n{2,}/)
-  return (
-    <div className="space-y-3 leading-relaxed">
-      {blocks.map((block, b) => {
-        const lines = block.split("\n").filter(l => l.trim())
-        const isList = lines.length > 0 && lines.every(l => /^\s*([-*•]|\d+[.)])\s+/.test(l))
-        if (isList)
-          return (
-            <ul key={b} className="list-disc space-y-1 pl-5">
-              {lines.map((l, i) => (
-                <li key={i}>{inline(l.replace(/^\s*([-*•]|\d+[.)])\s+/, ""), `${b}-${i}`)}</li>
-              ))}
-            </ul>
-          )
-        return (
-          <p key={b} className="whitespace-pre-wrap">
-            {inline(block.replace(/^#{1,4}\s*/gm, ""), `${b}`)}
-          </p>
-        )
-      })}
-    </div>
-  )
+  // Ta bort eventuell formelkod ($…$) så att den inte syns som tecken
+  const clean = text.replace(/\r/g, "").replace(/\$([^$\n]{1,80})\$/g, (_, f) => f.replace(/[{}\\]/g, "").replace(/_/g, ""))
+  const nodes: ReactNode[] = []
+  let paragraph: string[] = []
+  const flush = () => {
+    if (paragraph.length) nodes.push(<p key={nodes.length} className="whitespace-pre-wrap">{inline(paragraph.join("\n"), `p${nodes.length}`)}</p>)
+    paragraph = []
+  }
+  clean.split("\n").forEach((raw, i) => {
+    const line = raw.replace(/\s+$/, "")
+    const bullet = /^(\s*)([-*•]|\d+[.)])\s+(.*)$/.exec(line)
+    if (!line.trim()) return flush()
+    if (/^\s*(-{3,}|\*{3,}|_{3,})\s*$/.test(line)) {
+      flush()
+      nodes.push(<hr key={`hr${i}`} className="border-border" />)
+    } else if (/^\s*#{1,4}\s+/.test(line)) {
+      flush()
+      nodes.push(<h3 key={`h${i}`} className="pt-1 font-semibold">{inline(line.replace(/^\s*#{1,4}\s+/, "").replace(/\*\*/g, ""), `h${i}`)}</h3>)
+    } else if (bullet) {
+      flush()
+      const depth = Math.min(3, Math.floor(bullet[1].replace(/\t/g, "  ").length / 2))
+      const marker = /\d/.test(bullet[2]) ? bullet[2] : "•"
+      nodes.push(
+        <div key={`li${i}`} className="flex gap-2" style={{ paddingLeft: `${depth * 1.1}rem` }}>
+          <span className="shrink-0 text-muted-foreground">{marker}</span>
+          <span className="min-w-0">{inline(bullet[3], `li${i}`)}</span>
+        </div>
+      )
+    } else {
+      paragraph.push(line)
+    }
+  })
+  flush()
+  return <div className="space-y-2 leading-relaxed">{nodes}</div>
 }
 
 export default function ChatPage() {

@@ -208,7 +208,7 @@ export default function ChatPage() {
               </div>
               <div>
                 <h1 className="text-xl font-semibold">Fråga om {semester}</h1>
-                <p className="mt-1 text-sm text-muted-foreground">Svaren bygger på terminens tentafrågor och hänvisar till källan.</p>
+                <p className="mt-1 text-sm text-muted-foreground">Svaren bygger på terminens föreläsningar och tentafrågor och hänvisar till källan.</p>
               </div>
               <div className="flex max-w-xl flex-wrap justify-center gap-2">
                 {(STARTERS[semester] ?? []).map(q => (

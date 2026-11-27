@@ -25,3 +25,5 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+# Föreläsningsmaterial för AI-chatten – laddas aldrig upp till GitHub
+/material/

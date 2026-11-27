@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { mockQuestions } from "@/lib/mock-data"
 import { supabaseAdmin as supabase } from "@/lib/supabase-server"
-import { LIMITED_SEMESTERS, requireAdmin, type AdminRole } from "@/lib/admin-auth"
+import { LIMITED_SEMESTERS, getAdminRole, requireAdmin, type AdminRole } from "@/lib/admin-auth"
+import { hasBetaAccess } from "@/lib/beta-auth"
 import type { Question } from "@/lib/types"
 
 export const dynamic = "force-dynamic"
@@ -62,7 +63,7 @@ async function fetchAllRows<T = any>(table: string, columns: string): Promise<T[
   return rows
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
     // 1. Fetch custom questions (alla sidor)
     const customQuestions = await fetchAllRows<any>('custom_questions', '*')
@@ -77,7 +78,9 @@ export async function GET() {
     const hiddenSet = new Set(hiddenIds.map(h => h.id))
 
     // 3. Map custom questions to local type (ensuring camelCase if they were snake_case)
-    const customMapped: Question[] = (customQuestions || []).map(q => ({
+    // Betafrågor skickas bara till den som har betakod eller är inloggad i admin
+    const seesBeta = hasBetaAccess(req) || !!getAdminRole(req)
+    const customMapped: Question[] = (customQuestions || []).filter(q => seesBeta || !q.is_beta).map(q => ({
       id: q.id,
       semester: q.semester,
       examType: q.exam_type,
@@ -94,7 +97,8 @@ export async function GET() {
       points: q.points,
       imageUrl: q.image_url,
       caseName: q.case_name || q.caseName,
-      lecture: q.lecture || undefined
+      lecture: q.lecture || undefined,
+      isBeta: q.is_beta || undefined
     }))
 
     // 4. Combine and filter
@@ -155,26 +159,35 @@ export async function POST(req: NextRequest) {
       image_url: q.imageUrl,
       case_name: q.caseName,
       // Skriv bara föreläsning om den skickas med (null = ta bort), så att en sparning utan fältet inte nollställer den
-      ...("lecture" in q ? { lecture: q.lecture?.trim() || null } : {})
+      ...("lecture" in q ? { lecture: q.lecture?.trim() || null } : {}),
+      ...("isBeta" in q ? { is_beta: !!q.isBeta } : {})
     }))
 
     let { error } = await supabase
       .from('custom_questions')
       .upsert(toUpsert)
 
+    // Kolumnen is_beta finns först efter supabase/beta.sql – spara utan den så länge
+    if (error && error.message?.includes('is_beta')) {
+      const fallbackResult = await supabase
+        .from('custom_questions')
+        .upsert(toUpsert.map(({ is_beta, ...rest }: any) => rest))
+      error = fallbackResult.error
+    }
+
     // Kolumnen lecture finns först efter supabase/lectures.sql – spara utan den så länge
     if (error && error.message?.includes('lecture')) {
       console.warn("Supabase custom_questions table missing 'lecture' column. Retrying without lecture...")
       const fallbackResult = await supabase
         .from('custom_questions')
-        .upsert(toUpsert.map(({ lecture, ...rest }: any) => rest))
+        .upsert(toUpsert.map(({ lecture, is_beta, ...rest }: any) => rest))
       error = fallbackResult.error
     }
 
     // Fallback if case_name column does not exist in Supabase custom_questions table schema yet
     if (error && (error.message?.includes('case_name') || error.message?.includes("'case_name'"))) {
       console.warn("Supabase custom_questions table missing 'case_name' column. Retrying without case_name...")
-      const fallbackUpsert = toUpsert.map(({ case_name, lecture, ...rest }: any) => rest)
+      const fallbackUpsert = toUpsert.map(({ case_name, lecture, is_beta, ...rest }: any) => rest)
       const fallbackResult = await supabase
         .from('custom_questions')
         .upsert(fallbackUpsert)

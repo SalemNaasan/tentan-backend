@@ -31,6 +31,7 @@ import { getBookmarkedIds, toggleBookmark as toggleBookmarkInStore, addBookmarks
 import { parseMatchingPairs } from "@/lib/matching"
 import { clearDone, getDoneIds, setDone } from "@/lib/done-store"
 import { LECTURES_ENABLED, lectureGroupsFor, lectureRank } from "@/lib/lectures"
+import { useBeta } from "@/lib/use-beta"
 import { clearAnswer } from "@/lib/answers-store"
 
 const PAGE_SIZE = 10
@@ -61,6 +62,8 @@ export default function StudyPage() {
   const [selectedCases, setSelectedCases] = useState<string[]>([])
   const [sortBy, setSortBy] = useState<"number-asc" | "number-desc" | "points-asc" | "points-desc" | "lecture">("number-asc")
   const [selectedLectures, setSelectedLectures] = useState<string[]>([])
+  const beta = useBeta()
+  const lecturesOn = LECTURES_ENABLED || beta
   const [searchQuery, setSearchQuery] = useState("")
 
 
@@ -107,8 +110,8 @@ export default function StudyPage() {
         if (Array.isArray(saved.cases)) setSelectedCases(saved.cases)
         if (typeof saved.onlyBookmarked === "boolean") setIsOnlyBookmarked(saved.onlyBookmarked)
         if (saved.done === "done" || saved.done === "todo") setDoneFilter(saved.done)
-        if (typeof saved.sortBy === "string" && (LECTURES_ENABLED || saved.sortBy !== "lecture")) setSortBy(saved.sortBy)
-        if (LECTURES_ENABLED && Array.isArray(saved.lectures)) setSelectedLectures(saved.lectures)
+        if (typeof saved.sortBy === "string") setSortBy(saved.sortBy)
+        if (Array.isArray(saved.lectures)) setSelectedLectures(saved.lectures)
         if (typeof saved.search === "string") setSearchQuery(saved.search)
         if (typeof saved.page === "number" && saved.page > 1) {
           skipPageReset.current = true
@@ -186,7 +189,7 @@ export default function StudyPage() {
       if (selectedInteractions.length > 0 && !selectedInteractions.includes(q.interaction)) {
         return false
       }
-      if (selectedLectures.length > 0 && !(q.lecture && selectedLectures.includes(q.lecture))) {
+      if (lecturesOn && selectedLectures.length > 0 && !(q.lecture && selectedLectures.includes(q.lecture))) {
         return false
       }
       if (selectedCases.length > 0) {
@@ -201,7 +204,7 @@ export default function StudyPage() {
         const matchesNumber = q.questionNumber.toString().includes(query)
         const matchesSubject = q.subjectArea.toLowerCase().includes(query)
         const matchesAnswer = q.answer?.toLowerCase().includes(query) || false
-        const matchesCase = q.caseName?.toLowerCase().includes(query) || (LECTURES_ENABLED && q.lecture?.toLowerCase().includes(query)) || false
+        const matchesCase = q.caseName?.toLowerCase().includes(query) || (lecturesOn && q.lecture?.toLowerCase().includes(query)) || false
         const matchesOptions = q.options?.some(opt => opt.toLowerCase().includes(query)) || false
         const matchesCorrectAnswer = typeof q.correctAnswer === "string"
           ? q.correctAnswer.toLowerCase().includes(query)
@@ -214,14 +217,14 @@ export default function StudyPage() {
       }
       return true
     }).sort((a, b) => {
-      if (sortBy === "lecture") {
+      if (sortBy === "lecture" && lecturesOn) {
         // Kursens ordning, sedan senaste tentan först och frågenummer
         const rank = lectureRank(a.semester, a.lecture) - lectureRank(b.semester, b.lecture)
         if (rank !== 0) return rank
         const period = (p: string) => { const m = /^(VT|HT)(\d{2})$/.exec(p); return m ? Number(m[2]) * 2 + (m[1] === "HT" ? 1 : 0) : -1 }
         return period(b.examPeriod) - period(a.examPeriod) || (Number(a.questionNumber) || 0) - (Number(b.questionNumber) || 0)
       }
-      if (sortBy === "number-asc" || sortBy === "number-desc") {
+      if (sortBy === "number-asc" || sortBy === "number-desc" || sortBy === "lecture") {
         const caseA = a.caseName || ""
         const caseB = b.caseName || ""
         if (caseA !== caseB) {
@@ -236,7 +239,7 @@ export default function StudyPage() {
         return sortBy === "points-asc" ? pA - pB : pB - pA
       }
     })
-  }, [questions, selectedSemesters, selectedExamTypes, selectedSubjects, selectedPeriods, isOnlyBookmarked, bookmarkedIds, selectedInteractions, selectedCases, sortBy, searchQuery, selectedLectures])
+  }, [questions, selectedSemesters, selectedExamTypes, selectedSubjects, selectedPeriods, isOnlyBookmarked, bookmarkedIds, selectedInteractions, selectedCases, sortBy, searchQuery, selectedLectures, lecturesOn])
 
   // Vilka val som har frågor givet ALLA andra filter (t.ex. gråas Omtenta om HT25 bara har ordinarie).
   // Varje grupp räknas utan sitt eget filter, så att man fortfarande kan välja flera inom gruppen.
@@ -251,7 +254,7 @@ export default function StudyPage() {
       (skip === "subject" || selectedSubjects.length === 0 || selectedSubjects.includes(q.subjectArea)) &&
       (skip === "interaction" || selectedInteractions.length === 0 || selectedInteractions.includes(q.interaction)) &&
       (skip === "case" || selectedCases.length === 0 || (!!q.caseName && selectedCases.some(c => c.toLowerCase() === caseLabel(q.caseName!).toLowerCase()))) &&
-      (skip === "lecture" || selectedLectures.length === 0 || (!!q.lecture && selectedLectures.includes(q.lecture)))
+      (skip === "lecture" || !lecturesOn || selectedLectures.length === 0 || (!!q.lecture && selectedLectures.includes(q.lecture)))
     const values = <T,>(skip: Facet, pick: (q: Question) => T) => new Set(questions.filter(q => passes(q, skip)).map(pick))
     return {
       examTypes: values("examType", q => q.examType) as Set<string>,
@@ -261,7 +264,7 @@ export default function StudyPage() {
       lectures: values("lecture", q => q.lecture ?? "") as Set<string>,
       cases: new Set(questions.filter(q => passes(q, "case") && q.caseName).map(q => caseLabel(q.caseName!))),
     }
-  }, [questions, selectedSemesters, selectedExamTypes, selectedPeriods, selectedSubjects, selectedInteractions, selectedCases, selectedLectures])
+  }, [questions, selectedSemesters, selectedExamTypes, selectedPeriods, selectedSubjects, selectedInteractions, selectedCases, selectedLectures, lecturesOn])
 
   // Gjorda frågor räknas inom det aktuella urvalet, t.ex. 39/210 för T1 HT25
   const doneSet = useMemo(() => new Set(doneIds), [doneIds])
@@ -531,7 +534,7 @@ export default function StudyPage() {
     selectedInteractions.length > 0 ||
     isOnlyBookmarked ||
     doneFilter !== "all" ||
-    selectedLectures.length > 0
+    (lecturesOn && selectedLectures.length > 0)
 
   const filterSidebarContent = (
     <FilterSidebar
@@ -548,7 +551,7 @@ export default function StudyPage() {
       selectedInteractions={selectedInteractions}
       setSelectedInteractions={setSelectedInteractions}
       selectedCases={selectedCases}
-      lectureGroups={LECTURES_ENABLED ? lectureGroupsFor(selectedSemesters) : []}
+      lectureGroups={lecturesOn ? lectureGroupsFor(selectedSemesters) : []}
       selectedLectures={selectedLectures}
       setSelectedLectures={setSelectedLectures}
       setSelectedCases={setSelectedCases}
@@ -850,7 +853,7 @@ export default function StudyPage() {
                     <SelectItem value="number-desc">Nummer (Fallande)</SelectItem>
                     <SelectItem value="points-asc">Poäng (Stigande)</SelectItem>
                     <SelectItem value="points-desc">Poäng (Fallande)</SelectItem>
-                    {LECTURES_ENABLED && <SelectItem value="lecture">Föreläsning</SelectItem>}
+                    {lecturesOn && <SelectItem value="lecture">Föreläsning</SelectItem>}
                   </SelectContent>
                 </Select>
                 <Button

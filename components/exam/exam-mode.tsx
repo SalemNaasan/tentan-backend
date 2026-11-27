@@ -115,8 +115,8 @@ export function ExamMode() {
 
   const exams = useMemo(() => {
     const map = new Map<string, ExamInfo>()
-    // Frågor utan känd tenta kan inte bilda en hel tenta
-    for (const q of (questions ?? []).filter(x => x.examPeriod !== "Okänd")) {
+    // Frågor utan känd tenta kan inte bilda en hel tenta, och betafrågor (OneNote) är bara delar av tentor
+    for (const q of (questions ?? []).filter(x => x.examPeriod !== "Okänd" && !x.isBeta)) {
       const key = examKeyOf(q)
       const exam = map.get(key) ?? { key, semester: q.semester, period: q.examPeriod, type: q.examType, questions: [], total: 0 }
       exam.questions.push(q)

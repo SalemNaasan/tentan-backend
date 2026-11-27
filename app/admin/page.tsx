@@ -1650,6 +1650,11 @@ export default function AdminPage() {
                                       {question.lecture}
                                     </Badge>
                                   )}
+                                  {question.isBeta && (
+                                    <Badge variant="outline" className="text-xs border-primary/30 bg-primary/10 text-primary">
+                                      Beta
+                                    </Badge>
+                                  )}
                                   {duplicateQuestionIdSet.has(question.id) && (
                                     <Badge variant="destructive" className="text-xs flex items-center gap-1">
                                       <Copy className="h-3 w-3" />
@@ -2289,6 +2294,17 @@ export default function AdminPage() {
                   ))}
                 </datalist>
               </div>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 accent-primary"
+                  checked={!!editingAvailableQuestion.isBeta}
+                  onChange={(e) =>
+                    setEditingAvailableQuestion((prev) => (prev ? { ...prev, isBeta: e.target.checked } : null))
+                  }
+                />
+                Betafråga – syns bara för den som aktiverat en betakod på /beta
+              </label>
               <div className="flex justify-end gap-2 pt-4">
                 <Button variant="outline" onClick={() => setEditingAvailableQuestion(null)}>
                   Avbryt

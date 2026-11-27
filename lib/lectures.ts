@@ -4,9 +4,9 @@ import type { Semester } from "./types"
 // Frågorna kopplas till en föreläsning via fältet lecture.
 
 /**
- * Visar föreläsningsfilter, sortering och etikett på övningssidan.
- * Avstängt tills vidare – sätt till true för att visa funktionen igen.
- * (Föreläsningarna finns kvar på frågorna och kan redigeras i admin.)
+ * Visar föreläsningsfilter, sortering och etikett på övningssidan för alla.
+ * Avstängt tills vidare: då syns funktionen bara för den som aktiverat en betakod på /beta.
+ * Sätt till true för att visa den för alla. (Föreläsningarna finns kvar på frågorna och kan redigeras i admin.)
  */
 export const LECTURES_ENABLED = false
 

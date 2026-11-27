@@ -75,6 +75,8 @@ export interface Question {
   caseName?: string
   /** Föreläsningen frågan hör till, t.ex. "Erytropoes" (se lib/lectures.ts) */
   lecture?: string | null
+  /** Syns bara med betakod (och i admin) */
+  isBeta?: boolean
 }
 
 export interface Exam {
